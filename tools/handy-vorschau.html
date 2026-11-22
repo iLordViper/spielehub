@@ -1,9 +1,16 @@
 <!doctype html>
-<!-- Handy-Vorschau: zeigt eine Seite des Hubs in Handygröße (375 × 760), zum Prüfen vor dem Hochladen.
-     Aufruf beim lokalen Test:  http://localhost:8080/tools/handy-vorschau.html?seite=wuerfelclash/?demo
+<!-- Handy-Vorschau: zeigt eine Seite des Hubs in Handygröße, zum Prüfen vor dem Hochladen.
+     Hochkant:  http://localhost:8080/tools/handy-vorschau.html?seite=kritzelclash/?demo
+     Quer:      http://localhost:8080/tools/handy-vorschau.html?seite=kritzelclash/?demo&quer=1
+     (Bei „seite“ mit eigenem ? das & für quer ans Ende hängen – es wird erkannt.)
      Nur ein Werkzeug – wird von keiner Spielseite benutzt. -->
 <meta charset="utf-8"><title>Handy-Vorschau</title>
 <style>body{margin:0;background:#222;display:flex;gap:24px;justify-content:center;align-items:flex-start;padding:20px;font:14px system-ui;color:#ccc}
 .frame{border:10px solid #000;border-radius:34px;overflow:hidden;box-shadow:0 10px 40px #000}iframe{display:block;border:0;background:#0E1A2B}</style>
-<div><p id="t"></p><div class="frame"><iframe id="f" width="375" height="760"></iframe></div></div>
-<script>const s=new URLSearchParams(location.search).get('seite')||'?demo';document.getElementById('f').src='../'+s;document.getElementById('t').textContent='375 × 760 · '+s</script>
+<div><p id="t"></p><div class="frame"><iframe id="f"></iframe></div></div>
+<script>
+const q=location.search;const quer=/[?&]quer=1/.test(q);
+const s=(new URLSearchParams(q).get('seite')||'?demo').replace(/&?quer=1/,'');
+const f=document.getElementById('f');f.width=quer?780:375;f.height=quer?375:760;f.src='../'+s;
+document.getElementById('t').textContent=(quer?'780 × 375 (quer)':'375 × 760')+' · '+s;
+</script>
