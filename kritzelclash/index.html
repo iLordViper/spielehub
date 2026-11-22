@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="de">
+<head>
+<!-- ==========================================================================
+     KRITZELCLASH (kritzelclash/index.html) – Spiel 3 im Spiele-Hub
+     --------------------------------------------------------------------------
+     Mal-und-Rate-Spiel für 2–8 Freunde: Reihum zeichnet einer einen Begriff,
+     die anderen raten im Chat. Schnell raten = mehr Punkte, der Zeichner
+     bekommt Punkte für jeden, der es errät.
+
+     Dateien: woerter.js (Begriffe, Rate-Prüfung) · ../shared/* (Hub-Bausteine)
+
+     WAS WO GESPEICHERT WIRD (nichts wird automatisch gelöscht):
+       partien/kritzelclash/liste/{id}                     der Raum / die Partie
+       partien/kritzelclash/liste/{id}/zuege/{zug}/striche jede Linie jedes Bildes
+       partien/kritzelclash/liste/{id}/chat                Tipps, Emojis, Meldungen
+       spielstand/kritzelclash/spieler/{uid}               Punkte, Münzen, Siege …
+     Der Begriff steht nur als Fingerabdruck (SHA-256) im Raum, im Klartext erst
+     nach der Auflösung.
+
+     Ablauf einer Runde (Feld „phase“ im Raum):
+       wahl        Zeichner wählt aus 3 Begriffen (15 s)
+       malen       Zeichner malt, alle anderen raten (Zeit aus den Einstellungen)
+       aufloesung  Begriff wird gezeigt (6 s), dann ist der Nächste dran
+     Gesteuert wird das vom Gerät des Zeichners. Ist der weg, übernimmt nach
+     10 s Verspätung jeder andere (Transaktion verhindert Doppelschritte).
+
+     Testmodus ?demo: nur das Übungsblatt, ohne Datenbank.
+     ========================================================================== -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kritzelclash</title>
+<meta name="theme-color" content="#0E1A2B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%8F%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Lilita+One&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* ==========================================================================
+   Nur Kritzelclash. Look: Zeichenblock auf der Bühne – weißes Papier mit
+   Klebestreifen, bunte Stifte, Hub-Farben drumherum.
+   ========================================================================== */
+:root{--hand:"Caveat","Segoe Print",cursive}
+span.av{display:block;flex:none;overflow:hidden;border-radius:50%}
+#app{max-width:1100px}
+.top-l{display:flex;align-items:center;gap:10px;min-width:0}
+body.full #view{padding-top:8px}
+
+/* ---------- Spielfläche ---------- */
+.kc{display:grid;gap:12px}
+@media (min-width:900px){.kc{grid-template-columns:minmax(0,1fr) 330px;align-items:start}.kc .side{position:sticky;top:0}}
+.ktop{display:flex;align-items:center;gap:8px}
+.ktop .qlabel{font-size:16px;text-align:left}
+.ibtn{flex:none;width:40px;height:40px;border-radius:12px;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;font-size:17px;position:relative}
+.wortbox{flex:1;min-width:0;text-align:center;font-family:var(--font-display);font-size:clamp(18px,4.6vw,26px);letter-spacing:.14em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--gold);text-shadow:0 3px 0 #6E4600}
+.wortbox small{font-family:var(--font-body);font-size:12px;letter-spacing:0;color:var(--muted);text-shadow:none;margin-left:6px}
+.wortbox.ich{color:var(--mint);text-shadow:0 3px 0 #0A4F37;letter-spacing:.04em}
+.zeit{flex:none;position:relative;width:46px;height:46px}
+.zeit svg{width:46px;height:46px;transform:rotate(-90deg)}
+.zeit circle{fill:none;stroke-width:5}
+.zeit .bg{stroke:var(--surface-2)}.zeit .fg{stroke:var(--gold);stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .3s}
+.zeit.knapp .fg{stroke:var(--red)}
+.zeit b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-display);font-size:15px;font-variant-numeric:tabular-nums}
+.blatt{position:relative;border-radius:6px;background:#fff;box-shadow:0 1px 0 #E6DEC4,0 2px 0 #D9D0B4,0 14px 30px rgba(0,0,0,.45);touch-action:none;overflow:hidden}
+.blatt::before,.blatt::after{content:"";position:absolute;top:-8px;width:80px;height:22px;background:rgba(255,248,214,.6);z-index:3;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.blatt::before{left:22px;transform:rotate(-5deg)}.blatt::after{right:22px;transform:rotate(4deg)}
+.blatt canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;max-width:100%;cursor:crosshair}
+.blatt.zuschauer canvas{cursor:default}
+.overlay{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center;background:rgba(14,26,43,.82);backdrop-filter:blur(3px);color:var(--ink);animation:fade .25s}
+.overlay h3{font-family:var(--font-display);font-weight:400;font-size:clamp(22px,5vw,32px);margin:0;line-height:1.1}
+.overlay .gross{font-family:var(--font-display);font-size:clamp(30px,8vw,52px);color:var(--gold);text-shadow:0 4px 0 #6E4600;letter-spacing:.05em}
+.wahl{display:grid;gap:10px;width:min(100%,360px)}
+.wahl .btn{font-size:22px}
+.wahl .btn small{font-family:var(--font-body);font-size:12px;opacity:.8}
+.zugliste{display:grid;gap:4px;width:min(100%,320px);font-weight:800;font-size:14px}
+.zugliste div{display:flex;justify-content:space-between;gap:8px;background:rgba(255,255,255,.06);border-radius:10px;padding:5px 10px}
+.zugliste b{color:var(--mint)}
+
+/* ---------- Werkzeuge (nur Zeichner) ---------- */
+.tools{display:grid;gap:8px;background:var(--surface);border-radius:18px;padding:10px;border:2px solid var(--line)}
+.farben{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.farben::-webkit-scrollbar{display:none}
+.farbe{flex:none;width:32px;height:32px;border-radius:50%;border:3px solid var(--surface-2);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.farbe.on{border-color:#fff;transform:scale(1.15);box-shadow:0 0 0 2px var(--gold)}
+.trow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tool{min-width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;font-size:20px;border:2px solid transparent;padding:0 8px}
+.tool.on{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 22%,var(--surface-2))}
+.groesse{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;border:2px solid transparent}
+.groesse i{display:block;border-radius:50%;background:var(--ink)}
+.groesse.on{border-color:var(--gold)}
+.sep{width:2px;height:30px;background:var(--line);margin:0 2px}
+
+/* Farbknopf + Pinselgröße */
+.farbknopf i{display:block;width:24px;height:24px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.dicke{flex:1;min-width:120px;display:flex;align-items:center;gap:8px;height:44px;padding:0 10px;border-radius:12px;background:var(--surface-2)}
+.dicke .dv{flex:none;width:32px;height:32px;display:grid;place-items:center}
+.dicke .dv i{display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 0 2px rgba(255,255,255,.25)}
+.dicke input{flex:1;min-width:0;accent-color:var(--gold);height:28px}
+.farben{display:none;flex-wrap:wrap}
+.farben.offen{display:flex}
+@media (min-width:900px){.farben{display:flex}.farbknopf{display:none!important}}
+
+/* ---------- Rate-Feed: Tipps schweben als Blasen unten AUF der Leinwand (nur Zeichner) ---------- */
+.feed{position:absolute;left:8px;right:8px;bottom:8px;z-index:2;max-height:48%;overflow:hidden;display:flex;flex-wrap:wrap-reverse;align-content:flex-start;gap:6px;pointer-events:none}
+.tbub{display:flex;align-items:center;gap:7px;max-width:100%;background:#F5F0E6;color:#14223A;border-radius:16px 16px 16px 5px;padding:5px 11px 5px 5px;font-weight:800;font-size:14px;box-shadow:0 6px 16px rgba(0,0,0,.35);animation:bubIn .3s cubic-bezier(.2,1.5,.4,1),bubOut .4s ease-in forwards;animation-delay:0s,3.4s}
+.tbub .av{flex:none;width:26px;height:26px;border-radius:50%;overflow:hidden}
+.tbub.ok{background:var(--mint);color:#06281A}
+.tbub.knapp{background:var(--gold);color:#2A1700}
+.tbub.e{background:none;box-shadow:none;font-size:30px;padding:0}
+@keyframes bubIn{from{transform:translateY(10px) scale(.6);opacity:0}}
+@keyframes bubOut{to{transform:translateY(-8px);opacity:0}}
+.emorow{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.emorow::-webkit-scrollbar{display:none}
+.emo{flex:none;width:42px;height:42px;border-radius:13px;background:var(--surface-2);font-size:22px;display:grid;place-items:center}
+.emo:active{transform:scale(.8) rotate(-8deg)}
+.fly{position:fixed;bottom:-70px;font-size:56px;z-index:66;pointer-events:none;animation:fly 2.6s cubic-bezier(.2,.7,.3,1) forwards;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}
+@keyframes fly{0%{transform:translateY(0) scale(.5)}18%{transform:translateY(-28vh) scale(1.35) rotate(-12deg)}100%{transform:translateY(-110vh) scale(1) rotate(14deg);opacity:.2}}
+
+/* ---------- Spielerliste ---------- */
+.spieler{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px}
+.spieler::-webkit-scrollbar{display:none}
+@media (min-width:900px){.spieler{display:grid;overflow:visible}}
+.sp{flex:none;position:relative;display:flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:5px 10px 5px 5px;min-width:0}
+.sp .av{flex:none;width:34px;height:34px;border-radius:50%;overflow:hidden}
+.sp .nm{font-size:12.5px;font-weight:900;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.sp .pt{font-family:var(--font-display);font-size:16px;color:var(--gold);font-variant-numeric:tabular-nums}
+.sp.zeichner{border-color:var(--sky)}
+.sp.ok{border-color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,var(--surface))}
+.sp.weg{opacity:.4}
+.sp .mk{position:absolute;top:-8px;right:-4px;font-size:15px}
+.sp.ich .nm{color:var(--gold)}
+
+/* ---------- Chat der Rater ---------- */
+.chat{display:flex;flex-direction:column;gap:8px;background:var(--surface);border-radius:18px;padding:10px;border:2px solid var(--line)}
+.msgs{height:clamp(150px,30vh,360px);overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:4px 2px;overscroll-behavior:contain}
+.m{font-size:14.5px;line-height:1.35;overflow-wrap:anywhere;padding:4px 8px;border-radius:10px}
+.m b{color:var(--sky);margin-right:4px}
+.m.ich b{color:var(--gold)}
+.m.ok{background:color-mix(in srgb,var(--mint) 20%,transparent);color:var(--mint);font-weight:900}
+.m.knapp{background:color-mix(in srgb,var(--gold) 18%,transparent);color:var(--gold);font-weight:900}
+.m.sys{color:var(--muted);font-weight:800;font-size:13px;text-align:center}
+.m.geheim{opacity:.75;font-style:italic}
+.crow{display:flex;gap:8px;align-items:center}.crow .inp{flex:1;min-width:0;font-size:16px;min-height:48px}
+.sendb{flex:none;width:48px;height:48px;border-radius:14px;background:var(--gold);color:#2A1700;font-size:20px;box-shadow:0 4px 0 var(--gold-deep);display:grid;place-items:center}
+.inp.okay{border-color:var(--mint)}
+
+/* ---------- Handy (unter 900 px) ----------
+   Eine Spalte in dieser Reihenfolge: Wort & Zeit → Spielerleiste → Leinwand →
+   Werkzeuge (Zeichner) / Chat mit Eingabe (Rater) → Sprechblasen.
+   main/side lösen sich dafür auf (display:contents), „order“ sortiert. */
+@media (max-width:899px){
+  .kc{display:flex;flex-direction:column;gap:8px}
+  .kc .main,.kc .side{display:contents}
+  .ktop{order:1}.spieler{order:2}.blatt{order:3}#werkzeuge{order:4}.feed{order:5}.chat{order:6}
+  /* Zeichner: so viel Leinwand wie möglich – randlos, ohne Spielerleiste und Chat. */
+  .kc.male .chat,.kc.male .spieler{display:none}
+  .kc.male .blatt{margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));border-radius:0}
+  .kc.male .blatt::before,.kc.male .blatt::after{display:none}
+  .kc.male .ktop .ibtn{width:36px;height:36px}
+  .tools .trow{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px}
+  .tools .trow::-webkit-scrollbar{display:none}
+  .tools .tool{min-width:36px;width:36px;height:40px;padding:0;font-size:17px}
+  .dicke{min-width:70px;padding:0 6px;gap:4px;height:40px}.dicke .dv{width:24px;height:24px}
+  .kc.male .tools{margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));border-radius:0;border-left:0;border-right:0;padding:6px max(8px,env(safe-area-inset-left,0px))}
+  .farben{gap:6px}
+  .spieler{gap:6px;padding-bottom:2px}
+  .sp{padding:3px 8px 3px 3px;gap:6px}.sp .av{width:28px;height:28px}.sp .nm{font-size:11.5px;max-width:80px}.sp .pt{font-size:14px}
+  .msgs{height:clamp(110px,24vh,220px)}
+  .wortbox{white-space:normal;line-height:1.1;font-size:clamp(16px,5.2vw,24px);letter-spacing:.08em}
+  .tools{padding:8px;gap:6px}
+  .farbe{width:28px;height:28px}
+  .tool,.groesse{min-width:40px;width:auto;height:40px;font-size:18px}
+  .groesse{width:40px}
+  .sep{display:none}
+  .feed{min-height:60px}
+}
+/* Querformat am Handy: Leinwand nicht höher als der Bildschirm. */
+@media (max-height:520px) and (orientation:landscape){
+  .blatt{max-width:calc((100svh - 70px) * 4 / 3);margin:0 auto;width:100%}
+}
+
+/* ---------- Menü & Raum ---------- */
+.hero{text-align:center;padding-top:4px}
+.kritzel{font-family:var(--hand);font-size:22px;color:var(--muted);margin-top:4px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.mode{position:relative;border-radius:22px;padding:14px;text-align:left;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;color:#fff;background:linear-gradient(150deg,var(--g1),var(--g2));box-shadow:0 6px 0 var(--sh);min-width:0}
+.mode:active{transform:translateY(5px);box-shadow:0 1px 0 var(--sh)}
+.mode::before{content:"";position:absolute;width:140px;height:140px;border-radius:50%;right:-50px;top:-60px;background:rgba(255,255,255,.12)}
+.mode.wide{grid-column:1/-1}
+.mode .big{font-size:32px;line-height:1}
+.mode h3{font-family:var(--font-display);font-weight:400;font-size:22px;margin:0;line-height:1.05}
+.mode p{margin:3px 0 0;font-size:12.5px;font-weight:800;opacity:.92;line-height:1.3}
+.mode:disabled{filter:grayscale(.7);opacity:.6}
+.raum{max-width:560px;margin:0 auto}
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px}
+.pslot{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;position:relative}
+.pslot .av{width:100%;max-width:64px;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid var(--surface-2)}
+.pslot.leer .av{border-style:dashed;display:grid;place-items:center;color:var(--muted);font-size:22px;background:var(--bg2)}
+.pslot .nm{font-size:12px;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pslot .kr{position:absolute;top:-8px;right:4px;font-size:16px}
+.seg{margin-top:4px}
+.tag{font-size:11.5px;font-weight:900;padding:4px 9px;border-radius:99px;background:var(--surface-2);white-space:nowrap}
+.tag.go{background:var(--gold);color:#2A1700}
+.res{text-align:center;padding-top:10px;max-width:560px;margin:0 auto}
+.res h1{font-family:var(--font-display);font-weight:400;font-size:clamp(32px,10vw,46px);margin:8px 0 4px;color:var(--gold);text-shadow:0 4px 0 #6E4600}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin-top:16px}
+.pod{flex:1;max-width:120px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.pod .av{width:58px;height:58px;border-radius:50%;overflow:hidden;border:4px solid #fff}
+.pod.p1 .av{width:74px;height:74px;border-color:var(--gold)}
+.pod .nm{font-weight:900;font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod .sc{font-family:var(--font-display);font-size:17px;color:var(--gold)}
+.pod .blk{width:100%;display:grid;place-items:center;font-size:28px;border-radius:14px 14px 0 0}
+.pod.p1 .blk{height:100px;background:linear-gradient(var(--gold),#C78A00)}
+.pod.p2 .blk{height:72px;background:linear-gradient(#C9D3E0,#8E9CB0)}
+.pod.p3 .blk{height:54px;background:linear-gradient(#E0A36B,#A8693A)}
+.acts{display:grid;gap:10px;margin-top:18px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top" id="top"></header>
+  <main id="view"></main>
+</div>
+<div id="fx" aria-hidden="true"></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="ovl-root"></div>
+
+<script src="../shared/core.js"></script>
+<script src="../shared/firebase.js"></script>
+<script src="../shared/games.js"></script>
+<script src="woerter.js"></script>
+<script>
+/* ==========================================================================
+   SPIELLOGIK
+   1. Einstellungen   2. Statistik   3. Leinwand (Zeichnen & Abspielen)
+   4. Raum & Runden   5. Raten & Chat   6. Ansichten   7. Aktionen   8. Start
+   ========================================================================== */
+const WA=WOERTER_API;
+const GAME_ID='kritzelclash';
+const DEMO=new URLSearchParams(location.search).has('demo');
+const KEY=k=>(DEMO?'kc_demo_':'kc_')+k;
+const PROFILE_KEY=DEMO?'hub_demo_profile':'ka_profile';
+const PFAD=`partien/${GAME_ID}/liste`;
+const STAND_PFAD=`spielstand/${GAME_ID}/spieler`;
+const MAX_SPIELER=8;
+const WAHL_ZEIT=15000, AUFLOESUNG_ZEIT=6000, VERSPAETUNG=10000;
+/* Punkte: Rater bekommt 50 + bis zu 250 je nach Restzeit (+50 wer zuerst), Zeichner 60 je Treffer.
+   Hub-Punkte am Ende: eigene Punkte / 10. Münzen: Sieger 5, alle anderen 1. */
+const PUNKTE={basis:50,zeit:250,erster:50,zeichner:60,hubTeiler:10};
+const MUENZEN={sieg:5,sonst:1};
+const FARBEN=['#1B1B1F','#FFFFFF','#8A8F99','#E5484D','#FF8A00','#FFC53D','#2BC48A','#178A5A','#3D8BFF','#1E3FA6','#8A5CF6','#FF7AD9','#A86D45','#F6D2B4','#5BC0FF','#6E4429'];
+/* Pinselgröße: Schieberegler von DICKE_MIN bis DICKE_MAX (Bildpunkte auf dem 1000er-Blatt). */
+const DICKE_MIN=2,DICKE_MAX=60,DICKE_START=10;
+const EMOJIS=['😂','🔥','👏','😱','🤔','🎨','💀','😍'];
+const FV=()=>firebase.firestore.FieldValue;
+
+const Z={online:false,fs:null,uid:null,me:null,stand:null,profiles:{},onlineIds:new Set(),view:{name:'loading'},
+ R:null,ref:null,unsub:[],chat:[],chatSeen:new Set(),striche:[],eigene:new Set(),leinwand:0,zugGeladen:-1,
+ werkzeug:'stift',farbe:FARBEN[0],groesse:LS.get(KEY('dicke'),DICKE_START),palette:false,strich:null,puffer:[],seq:0,wort:null,woerterWahl:null,
+ myGames:{},invites:{},tick:null,regieBusy:false,uebung:false,zuegeGemalt:new Set()};
+
+/* ---------- 2. Statistik ---------- */
+const myName=()=>(Z.me&&Z.me.name)||'Du';
+const myAvatar=()=>(Z.me&&Z.me.avatar)||DEFAULT_AV;
+const neuStand=()=>({punkte:0,muenzen:0,spiele:0,siege:0,erraten:0,gemalt:0,bestePunkte:0,gezaehlt:[]});
+const muenzenGesamt=()=>((Z.me&&Z.me.muenzen)||0)+((Z.stand&&Z.stand.muenzen)||0);
+async function ladeStand(){
+ Z.stand={...neuStand(),...LS.get(KEY('stand'),{})};
+ if(!Z.online)return;
+ try{const s=await Z.fs.doc(`${STAND_PFAD}/${Z.uid}`).get();if(s.exists){Z.stand={...neuStand(),...s.data()};LS.set(KEY('stand'),Z.stand)}}catch(e){console.warn(e)}
+}
+async function speichereStand(){LS.set(KEY('stand'),Z.stand);if(!Z.online)return;try{await Z.fs.doc(`${STAND_PFAD}/${Z.uid}`).set(Z.stand,{merge:true})}catch(e){console.warn(e)}}
+/* Partie genau einmal verbuchen (gezaehlt wird nie gekürzt). */
+function verbuche(R){
+ if(!R||!Z.stand||!R.players.includes(Z.uid)||Z.stand.gezaehlt.includes(R.id))return null;
+ if(R.status!=='fertig'||R.players.length<2)return null;
+ const st=Z.stand;const meine=(R.punkte||{})[Z.uid]||0;
+ const erraten=Z.chat.filter(m=>m.by===Z.uid&&m.typ==='richtig').length;
+ const sieg=R.winner===Z.uid;const coins=sieg?MUENZEN.sieg:MUENZEN.sonst;const pts=Math.round(meine/PUNKTE.hubTeiler);
+ st.spiele++;if(sieg)st.siege++;st.punkte+=pts;st.muenzen=(st.muenzen||0)+coins;st.erraten+=erraten;st.gemalt+=Z.zuegeGemalt.size;st.bestePunkte=Math.max(st.bestePunkte||0,meine);
+ st.gezaehlt=[...st.gezaehlt,R.id];speichereStand();return{pts,coins};
+}
+
+/* ---------- 3. Leinwand ----------
+   Interne Größe immer 1000 × 750, damit alle Geräte dasselbe Bild haben.
+   Ein Strich wird in Stücken (je ~150 ms) gespeichert: {s: Strich-Id, w: 'stift'|'fuellen',
+   f: Farbe, d: Dicke, p: [x,y,x,y,…], l: Leinwand-Nr., seq: Reihenfolge}. */
+const BW=1000,BH=750;
+let CV=null,CX=null;
+function leinwandBauen(){CV=$('#cv');if(!CV)return;CX=CV.getContext('2d',{willReadFrequently:true});CV.width=BW;CV.height=BH;alleZeichnen()}
+function leeren(){if(!CX)return;CX.fillStyle='#FFFFFF';CX.fillRect(0,0,BW,BH)}
+function zeichneStueck(c){
+ if(!CX||!c)return;
+ if(c.w==='fuellen'){fuellen(c.p[0],c.p[1],c.f);return}
+ const p=c.p||[];CX.strokeStyle=c.f;CX.fillStyle=c.f;CX.lineWidth=c.d;CX.lineCap='round';CX.lineJoin='round';
+ if(p.length===2){CX.beginPath();CX.arc(p[0],p[1],c.d/2,0,Math.PI*2);CX.fill();return}
+ CX.beginPath();CX.moveTo(p[0],p[1]);for(let i=2;i<p.length;i+=2)CX.lineTo(p[i],p[i+1]);CX.stroke();
+}
+function alleZeichnen(){if(!CX)return;leeren();Z.striche.filter(c=>c.l===Z.leinwand).sort((a,b)=>a.seq-b.seq).forEach(zeichneStueck)}
+/* Füllen: Fläche gleicher Farbe (mit etwas Toleranz) ersetzen. */
+function fuellen(x,y,farbe){
+ x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=BW||y>=BH)return;
+ const img=CX.getImageData(0,0,BW,BH),d=img.data;const i0=(y*BW+x)*4;const z=[d[i0],d[i0+1],d[i0+2]];
+ const n=parseInt(farbe.slice(1),16);const f=[n>>16&255,n>>8&255,n&255];
+ if(Math.abs(z[0]-f[0])+Math.abs(z[1]-f[1])+Math.abs(z[2]-f[2])<10)return;
+ const tol=60;const gleich=i=>Math.abs(d[i]-z[0])+Math.abs(d[i+1]-z[1])+Math.abs(d[i+2]-z[2])<=tol;
+ const stack=[x,y];const gesehen=new Uint8Array(BW*BH);
+ while(stack.length){const yy=stack.pop(),xx=stack.pop();let l=xx;while(l>=0&&!gesehen[yy*BW+l]&&gleich((yy*BW+l)*4))l--;l++;let r=xx;while(r<BW&&!gesehen[yy*BW+r]&&gleich((yy*BW+r)*4))r++;
+  for(let i=l;i<r;i++){const k=yy*BW+i;gesehen[k]=1;d[k*4]=f[0];d[k*4+1]=f[1];d[k*4+2]=f[2];d[k*4+3]=255;
+   if(yy>0&&!gesehen[k-BW]&&gleich((k-BW)*4))stack.push(i,yy-1);if(yy<BH-1&&!gesehen[k+BW]&&gleich((k+BW)*4))stack.push(i,yy+1)}}
+ CX.putImageData(img,0,0);
+}
+const ichZeichne=()=>!!Z.uebung||(!!Z.R&&Z.R.status==='laeuft'&&Z.R.phase==='malen'&&Z.R.zeichner===Z.uid);
+function punktVon(e){const r=CV.getBoundingClientRect();return[Math.round((e.clientX-r.left)/r.width*BW),Math.round((e.clientY-r.top)/r.height*BH)]}
+function stiftAn(e){
+ if(!ichZeichne()||!CV)return;e.preventDefault();CV.setPointerCapture&&CV.setPointerCapture(e.pointerId);
+ const [x,y]=punktVon(e);
+ if(Z.werkzeug==='fuellen'){const c={s:neuId(),w:'fuellen',f:Z.farbe,d:0,p:[x,y],l:Z.leinwand,seq:naechsteSeq()};zeichneStueck(c);sendeStueck(c);return}
+ const farbe=Z.werkzeug==='radierer'?'#FFFFFF':Z.farbe;
+ Z.strich={s:neuId(),f:farbe,d:Z.groesse*(Z.werkzeug==='radierer'?1.6:1),letzter:[x,y]};Z.puffer=[x,y];
+ zeichneStueck({w:'stift',f:farbe,d:Z.strich.d,p:[x,y]});
+ clearInterval(Z.flushT);Z.flushT=setInterval(flush,150);
+}
+function stiftBewegt(e){
+ if(!Z.strich)return;e.preventDefault();
+ /* Zwischenpunkte für glatte Linien – manche Geräte liefern eine leere Liste, dann nur das Ereignis selbst. */
+ const zw=e.getCoalescedEvents?e.getCoalescedEvents():[];const pts=zw.length?zw:[e];
+ for(const ev of pts){const [x,y]=punktVon(ev);const [lx,ly]=Z.strich.letzter;if(Math.abs(x-lx)+Math.abs(y-ly)<3)continue;
+  CX.strokeStyle=Z.strich.f;CX.lineWidth=Z.strich.d;CX.lineCap='round';CX.lineJoin='round';CX.beginPath();CX.moveTo(lx,ly);CX.lineTo(x,y);CX.stroke();
+  Z.strich.letzter=[x,y];Z.puffer.push(x,y)}
+}
+function stiftAus(){if(!Z.strich)return;flush();clearInterval(Z.flushT);Z.strich=null}
+function flush(){
+ if(!Z.strich||Z.puffer.length<2)return;
+ const c={s:Z.strich.s,w:'stift',f:Z.strich.f,d:Z.strich.d,p:Z.puffer.slice(),l:Z.leinwand,seq:naechsteSeq()};
+ Z.puffer=Z.strich.letzter.slice();   // nächstes Stück beginnt am letzten Punkt → keine Lücken
+ if(c.p.length>=2)sendeStueck(c);
+}
+const neuId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const naechsteSeq=()=>{Z.seq=Math.max(Z.seq+1,Date.now()*100);return Z.seq};
+function striche(zug){return Z.ref.collection('zuege').doc(String(zug)).collection('striche')}
+function sendeStueck(c){
+ Z.striche.push(c);
+ if(Z.uebung||!Z.ref)return;
+ const doc=striche(Z.R.zug).doc();c._id=doc.id;Z.eigene.add(doc.id);
+ doc.set({s:c.s,w:c.w,f:c.f,d:c.d,p:c.p,l:c.l,seq:c.seq}).catch(e=>console.warn('Strich',e));
+}
+async function rueckgaengig(){
+ if(!ichZeichne())return;const aktuell=Z.striche.filter(c=>c.l===Z.leinwand);if(!aktuell.length)return;
+ const letzte=aktuell.sort((a,b)=>a.seq-b.seq).pop().s;const weg=Z.striche.filter(c=>c.s===letzte);
+ Z.striche=Z.striche.filter(c=>c.s!==letzte);alleZeichnen();
+ if(!Z.uebung&&Z.ref)for(const c of weg)if(c._id)striche(Z.R.zug).doc(c._id).delete().catch(()=>{});
+}
+async function allesLoeschen(){
+ if(!ichZeichne())return;
+ if(Z.uebung){Z.leinwand++;alleZeichnen();return}
+ Z.leinwand=(Z.R.leinwand||0)+1;alleZeichnen();Z.ref.update({leinwand:Z.leinwand,updatedAt:Date.now()}).catch(()=>{});
+}
+/* Striche des aktuellen Zuges live mitlesen. */
+function stricheAbo(zug){
+ if(Z.stricheUnsub){Z.stricheUnsub();Z.stricheUnsub=null}
+ Z.striche=[];Z.eigene=new Set();Z.zugGeladen=zug;alleZeichnen();
+ Z.stricheUnsub=striche(zug).orderBy('seq').onSnapshot(s=>{
+  let neuZeichnen=false;
+  s.docChanges().forEach(ch=>{const d={...ch.doc.data(),_id:ch.doc.id};
+   if(ch.type==='added'){if(Z.eigene.has(d._id))return;Z.striche.push(d);if(d.l===Z.leinwand&&!neuZeichnen)zeichneStueck(d)}
+   else if(ch.type==='removed'){Z.striche=Z.striche.filter(c=>c._id!==d._id);neuZeichnen=true}});
+  if(neuZeichnen)alleZeichnen();
+ },e=>console.warn('Striche',e));
+}
+
+/* ---------- 4. Raum & Runden ---------- */
+const aktive=R=>R.players.filter(p=>!(R.weg||[]).includes(p));
+async function raumAnlegen(gegner){
+ if(!Z.online){toast('Dafür brauchst du Internet.');return}
+ if(!(Z.me&&Z.me.name)){holeProfil();return}
+ const id=neuId()+neuId();
+ const R={id,host:Z.uid,players:[Z.uid],info:{[Z.uid]:{name:myName(),avatar:myAvatar()}},invited:gegner||[],status:'lobby',einst:{runden:3,zeit:90},
+  runde:1,zug:0,zeichner:null,phase:null,phaseBis:0,wortHash:'',hinweis:'',aufloesung:'',erraten:[],punkte:{[Z.uid]:0},zugPunkte:{},leinwand:0,weg:[],benutzt:[],createdAt:Date.now(),updatedAt:Date.now(),winner:null};
+ try{await Z.fs.doc(`${PFAD}/${id}`).set(R)}catch(e){console.error(e);toast(e.code==='permission-denied'?'Die Datenbank ist für Kritzelclash noch nicht freigeschaltet.':'Raum konnte nicht angelegt werden.');return}
+ oeffneRaum(id);
+}
+async function beitreten(id){
+ if(!Z.online){toast('Dafür brauchst du Internet.');return}
+ if(!(Z.me&&Z.me.name)){holeProfil();return}
+ const ref=Z.fs.doc(`${PFAD}/${id}`);
+ try{await Z.fs.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists)throw new Error('weg');const d=s.data();
+  if(d.players.includes(Z.uid))return;
+  if(d.status!=='lobby')throw new Error('laeuft');if(d.players.length>=MAX_SPIELER)throw new Error('voll');
+  tx.update(ref,{players:[...d.players,Z.uid],[`info.${Z.uid}`]:{name:myName(),avatar:myAvatar()},[`punkte.${Z.uid}`]:0,updatedAt:Date.now()})});
+  oeffneRaum(id);
+ }catch(e){console.error(e);toast({weg:'Diesen Raum gibt es nicht mehr.',laeuft:'Die Partie läuft schon – beim nächsten Mal!',voll:'Der Raum ist voll (8 Spieler).'}[e.message]||'Beitreten hat nicht geklappt.')}
+}
+function oeffneRaum(id){
+ verlasseRaum(true);
+ Z.ref=Z.fs.doc(`${PFAD}/${id}`);Z.R=null;Z.chat=[];Z.chatSeen=new Set();Z.zuegeGemalt=new Set();Z.letztesErg=null;
+ go({name:'raum'});
+ Z.unsub.push(Z.ref.onSnapshot(s=>{if(!s.exists){toast('Der Raum wurde geschlossen.');verlasseRaum();return}
+  const alt=Z.R;Z.R={...s.data(),id:s.id};nachRaumUpdate(alt)},e=>{console.error(e);toast('Verbindung zum Raum verloren.')}));
+ let erst=true;
+ Z.unsub.push(Z.ref.collection('chat').orderBy('ts').limitToLast(150).onSnapshot(s=>{s.docChanges().forEach(ch=>{if(ch.type==='added')neueNachricht({...ch.doc.data(),id:ch.doc.id},erst)});erst=false;zeichneChat()},()=>{}));
+ clearInterval(Z.tick);Z.tick=setInterval(takt,250);
+}
+function verlasseRaum(still){
+ Z.unsub.forEach(u=>{try{u()}catch(e){}});Z.unsub=[];if(Z.stricheUnsub){Z.stricheUnsub();Z.stricheUnsub=null}
+ clearInterval(Z.tick);Z.ref=null;Z.R=null;Z.wort=null;Z.woerterWahl=null;Z.zugGeladen=-1;
+ if(!still)go({name:'menu'});
+}
+function nachRaumUpdate(alt){
+ const R=Z.R;
+ if(R.status==='fertig'||R.status==='abgebrochen'){zeigeErgebnis();return}
+ if(R.status==='lobby'){if(Z.view.name!=='raum')go({name:'raum'});else render();return}
+ if(R.zeichner===Z.uid)Z.zuegeGemalt.add(R.zug);
+ if(Z.zugGeladen!==R.zug){Z.leinwand=R.leinwand||0;if(Z.view.name!=='spiel')go({name:'spiel'});else zeichneSpiel(true);stricheAbo(R.zug);
+  if(R.zeichner===Z.uid){Z.wort=LS.get(KEY('wort_'+R.id+'_'+R.zug),null);Z.woerterWahl=null}else Z.wort=null}
+ else if((R.leinwand||0)!==Z.leinwand){Z.leinwand=R.leinwand||0;alleZeichnen()}
+ if(Z.view.name!=='spiel'){go({name:'spiel'});return}
+ if(alt&&alt.phase!==R.phase){zeichneSpiel(true);if(R.phase==='malen'&&R.zeichner!==Z.uid){toast(`${(R.info[R.zeichner]||{}).name} malt – rate los!`)}
+  if(R.phase==='aufloesung')ton('aufloesung')}
+ else zeichneSpiel(false);
+}
+async function starten(){
+ const R=Z.R;if(!R||R.host!==Z.uid)return;if(aktive(R).length<2){toast('Ihr braucht mindestens 2 Leute.');return}
+ const punkte={};R.players.forEach(p=>punkte[p]=0);
+ await Z.ref.update({status:'laeuft',runde:1,zug:0,zeichner:R.players[0],phase:'wahl',phaseBis:Date.now()+WAHL_ZEIT,punkte,zugPunkte:{},erraten:[],hinweis:'',wortHash:'',aufloesung:'',leinwand:0,updatedAt:Date.now()});
+}
+/* Wort wählen (nur Zeichner). */
+async function wortWaehlen(wort){
+ const R=Z.R;if(!R||R.zeichner!==Z.uid||R.phase!=='wahl')return;
+ Z.wort=wort;LS.set(KEY('wort_'+R.id+'_'+R.zug),wort);
+ const hash=await WA.hashWort(R.id,wort);
+ await Z.ref.update({phase:'malen',phaseBis:Date.now()+R.einst.zeit*1000,wortHash:hash,hinweis:WA.maske(wort,[]),offen:[],updatedAt:Date.now()});
+}
+/* Regie: läuft alle 250 ms. Der Zeichner treibt seinen Zug voran, alle anderen springen
+   nur ein, wenn er 10 s zu spät ist (z. B. Seite geschlossen). */
+async function takt(){
+ const R=Z.R;if(!R)return;zeichneZeit();
+ if(R.status!=='laeuft'||Z.regieBusy)return;const jetzt=Date.now();const zeichner=R.zeichner===Z.uid;
+ const ersatz=!zeichner&&jetzt>R.phaseBis+VERSPAETUNG&&aktive(R).filter(p=>p!==R.zeichner)[0]===Z.uid;
+ if(!zeichner&&!ersatz)return;
+ Z.regieBusy=true;try{
+  if(R.phase==='wahl'&&jetzt>R.phaseBis){if(zeichner){const w=(Z.woerterWahl||WA.dreiWoerter(R.benutzt))[0];await wortWaehlen(w)}else await schritt(R,{phase:'aufloesung',aufloesung:'(ausgelassen)',phaseBis:jetzt+AUFLOESUNG_ZEIT})}
+  else if(R.phase==='malen'){
+   const rater=aktive(R).filter(p=>p!==R.zeichner);const alle=rater.length>0&&rater.every(p=>(R.erraten||[]).includes(p));
+   if(jetzt>R.phaseBis||alle){await schritt(R,{phase:'aufloesung',aufloesung:zeichner&&Z.wort?Z.wort:'(unbekannt)',phaseBis:jetzt+AUFLOESUNG_ZEIT,benutzt:zeichner&&Z.wort?[...(R.benutzt||[]),Z.wort]:(R.benutzt||[])})}
+   else if(zeichner&&Z.wort){const gesamt=R.einst.zeit*1000,vorbei=gesamt-(R.phaseBis-jetzt);const ziel=vorbei>gesamt*.75?2:vorbei>gesamt*.5?1:0;const offen=R.offen||[];
+    if(offen.length<ziel){const i=WA.naechsterHinweis(Z.wort,offen);if(i!==null){const o=[...offen,i];await Z.ref.update({offen:o,hinweis:WA.maske(Z.wort,o)})}}}
+  }
+  else if(R.phase==='aufloesung'&&jetzt>R.phaseBis)await naechsterZug(R);
+ }catch(e){console.warn('Regie',e)}finally{Z.regieBusy=false}
+}
+/* Phasenwechsel nur, wenn sich seit dem Lesen nichts geändert hat (Transaktion). */
+async function schritt(R,patch){
+ await Z.fs.runTransaction(async tx=>{const s=await tx.get(Z.ref);const d=s.data();if(d.zug!==R.zug||d.phase!==R.phase||d.status!=='laeuft')return;tx.update(Z.ref,{...patch,updatedAt:Date.now()})});
+}
+async function naechsterZug(R){
+ const akt=aktive(R);if(akt.length<2){await schritt(R,{status:'fertig',winner:sieger(R)});return}
+ let i=R.players.indexOf(R.zeichner),runde=R.runde;
+ do{i++;if(i>=R.players.length){i=0;runde++}}while((R.weg||[]).includes(R.players[i]));
+ if(runde>R.einst.runden){await schritt(R,{status:'fertig',winner:sieger(R),phase:null});return}
+ await schritt(R,{zug:R.zug+1,runde,zeichner:R.players[i],phase:'wahl',phaseBis:Date.now()+WAHL_ZEIT,wortHash:'',hinweis:'',offen:[],aufloesung:'',erraten:[],zugPunkte:{},leinwand:0});
+}
+function sieger(R){const l=aktive(R).map(p=>[p,(R.punkte||{})[p]||0]).sort((a,b)=>b[1]-a[1]);return l.length>1&&l[0][1]===l[1][1]?'remis':(l[0]||[null])[0]}
+async function raumVerlassen(){
+ closeOverlay();const R=Z.R;if(!R){verlasseRaum();return}
+ try{
+  if(R.status==='lobby'){if(R.host===Z.uid&&R.players.length===1)await Z.ref.update({status:'abgebrochen',updatedAt:Date.now()});
+   else await Z.ref.update({players:FV().arrayRemove(Z.uid),host:R.host===Z.uid?R.players.find(p=>p!==Z.uid):R.host,updatedAt:Date.now()})}
+  else if(R.status==='laeuft'){await Z.ref.update({weg:FV().arrayUnion(Z.uid),updatedAt:Date.now()});
+   if(aktive(R).filter(p=>p!==Z.uid).length<2)await Z.ref.update({status:'fertig',winner:sieger({...R,weg:[...(R.weg||[]),Z.uid]})})}
+ }catch(e){console.warn(e)}
+ verlasseRaum();
+}
+
+/* ---------- 5. Raten & Chat ---------- */
+async function raten(text){
+ text=String(text||'').trim().slice(0,80);const R=Z.R;if(!text||!R)return;
+ if(Date.now()-(Z.lastSend||0)<500)return;Z.lastSend=Date.now();
+ const ich=Z.uid,zeichner=R.zeichner===ich,schon=(R.erraten||[]).includes(ich);
+ if(R.status==='laeuft'&&R.phase==='malen'&&!zeichner&&!schon&&R.wortHash&&(await WA.hashWort(R.id,text))===R.wortHash){
+  const rest=Math.max(0,(R.phaseBis-Date.now())/(R.einst.zeit*1000));const pts=Math.round(PUNKTE.basis+PUNKTE.zeit*rest)+((R.erraten||[]).length===0?PUNKTE.erster:0);
+  await Z.ref.update({erraten:FV().arrayUnion(ich),[`punkte.${ich}`]:FV().increment(pts),[`punkte.${R.zeichner}`]:FV().increment(PUNKTE.zeichner),[`zugPunkte.${ich}`]:FV().increment(pts),[`zugPunkte.${R.zeichner}`]:FV().increment(PUNKTE.zeichner),updatedAt:Date.now()});
+  sendeChat({typ:'richtig',t:''});confetti(50);ton('richtig');return;
+ }
+ /* Wer schon erraten hat (oder zeichnet), schreibt „geheim“ – das sehen nur die, die es auch wissen. */
+ sendeChat({typ:'tipp',t:text,geheim:R.status==='laeuft'&&R.phase==='malen'&&(zeichner||schon)});
+}
+function sendeChat(m){const R=Z.R;if(!Z.ref||!R)return;Z.ref.collection('chat').add({by:Z.uid,ts:Date.now(),zug:R.zug||0,...m}).catch(e=>{console.warn(e);toast('Nachricht kam nicht an.')})}
+function sendeEmoji(e){floatEmoji(e);if(Z.uebung)return;sendeChat({typ:'emo',t:e})}
+function neueNachricht(m,still){
+ if(Z.chatSeen.has(m.id))return;Z.chatSeen.add(m.id);Z.chat.push(m);if(Z.chat.length>300)Z.chat.shift();
+ const R=Z.R;if(still||!R)return;
+ if(m.typ==='emo'&&m.by!==Z.uid)floatEmoji(m.t);
+ /* Zeichner prüft Tipps auf „knapp daneben“ und gibt dem Rater (nur ihm) Bescheid. */
+ if(R.zeichner===Z.uid&&m.typ==='tipp'&&!m.geheim&&Z.wort&&m.zug===R.zug&&WA.knapp(m.t,Z.wort))sendeChat({typ:'knapp',an:m.by,t:m.t});
+ if(m.typ==='richtig'&&m.by!==Z.uid)ton('fremdRichtig');
+ if(m.typ==='knapp'&&m.an===Z.uid){toast(`„${m.t}“ ist knapp daneben! 🔥`);ton('knapp')}
+ if(R.zeichner===Z.uid)zeigeBlase(m);
+}
+const sichtbar=m=>{const R=Z.R;if(!R)return true;if(m.typ==='knapp')return m.an===Z.uid;if(m.geheim)return R.zeichner===Z.uid||(R.erraten||[]).includes(Z.uid)||m.by===Z.uid;return true};
+function nachrichtHTML(m){
+ const R=Z.R;const inf=(R&&R.info[m.by])||{name:'?'};const ich=m.by===Z.uid;
+ if(m.typ==='richtig')return `<div class="m ok">✔ ${esc(inf.name)} hat es erraten!</div>`;
+ if(m.typ==='knapp')return `<div class="m knapp">🔥 „${esc(m.t)}“ ist knapp daneben!</div>`;
+ if(m.typ==='emo')return `<div class="m${ich?' ich':''}"><b>${esc(inf.name)}</b><span style="font-size:22px">${esc(m.t)}</span></div>`;
+ return `<div class="m${ich?' ich':''}${m.geheim?' geheim':''}"><b>${esc(inf.name)}${m.geheim?' 🤫':''}</b>${esc(m.t)}</div>`;
+}
+function zeichneChat(){const box=$('#msgs');if(!box)return;const unten=box.scrollHeight-box.scrollTop-box.clientHeight<60;
+ box.innerHTML=Z.chat.filter(sichtbar).slice(-120).map(nachrichtHTML).join('')||'<div class="m sys">Noch keine Tipps. Schreib, was du erkennst!</div>';if(unten)box.scrollTop=box.scrollHeight}
+/* Zeichner sieht Tipps als Sprechblasen unter der Leinwand. */
+function zeigeBlase(m){const f=$('#feed');if(!f||!sichtbar(m)||m.by===Z.uid&&m.typ!=='emo')return;const inf=(Z.R.info[m.by])||{};
+ const b=document.createElement('div');b.className='tbub'+(m.typ==='richtig'?' ok':m.typ==='emo'?' e':m.typ==='knapp'?' knapp':'');
+ b.innerHTML=m.typ==='emo'?esc(m.t):`<span class="av">${avatarSVG(inf.avatar)}</span><span>${m.typ==='richtig'?`✔ ${esc(inf.name)} hat's!`:m.typ==='knapp'?`${esc(m.t)} (knapp)`:esc(m.t)}</span>`;
+ f.appendChild(b);setTimeout(()=>b.remove(),3800);while(f.children.length>8)f.firstChild.remove()}
+function floatEmoji(e){const d=document.createElement('div');d.className='fly';d.textContent=e;d.style.left=(10+Math.random()*75)+'%';document.body.appendChild(d);setTimeout(()=>d.remove(),2800)}
+
+/* Töne: kurze erzeugte Signale (kein Download nötig). */
+let AC=null;function ton(art){if(!LS.get(KEY('ton'),true))return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();
+ const seq={richtig:[[523,.08],[659,.08],[784,.08],[1046,.22]],fremdRichtig:[[784,.07],[1046,.12]],knapp:[[440,.08],[523,.1]],aufloesung:[[392,.1],[330,.16]],tick:[[880,.03]]}[art]||[];
+ let t=AC.currentTime;seq.forEach(([f,d])=>{const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.16,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.03);t+=d*.9})}catch(e){}}
+
+/* ---------- 6. Ansichten ---------- */
+function go(v){Z.view=v;render()}
+function render(){
+ const n=Z.view.name;document.body.classList.toggle('full',n==='spiel'||n==='uebung');renderTop();
+ if(n==='spiel'){$('#view').innerHTML=spielGeruest();zeichneSpiel(true);return}
+ if(n==='uebung'){$('#view').innerHTML=uebungGeruest();leinwandBauen();werkzeugeZeigen();return}
+ $('#view').innerHTML=(VIEWS[n]||VIEWS.menu)(Z.view);
+}
+function renderTop(){
+ $('#top').innerHTML=`<div class="top-l"><a class="xbtn" href="../" aria-label="Zurück zu allen Spielen">‹</a><div class="logo">KRITZEL<span>CLASH</span></div></div>
+ <div class="top-r">${Z.online?`<span class="chip"><i class="live"></i>${Z.onlineIds.size+1}</span>`:''}${Z.stand?`<span class="chip">🪙 ${fmt(muenzenGesamt())}</span><span class="chip gold">⭐ ${fmt(Z.stand.punkte)}</span>`:''}</div>`;
+}
+const avHTML=inf=>`<span class="av">${avatarSVG((inf||{}).avatar)}</span>`;
+function holeProfil(){openOverlay(`<h3>Erst ein Charakter</h3><p>Leg im Hub deinen Charakter an, dann kannst du mit Freunden kritzeln.</p><div class="acts"><a class="btn block" href="../">Zum Hub</a><button class="btn ghost block" data-a="closeOvl">Später</button></div>`)}
+function noticeHTML(){
+ if(DEMO)return `<div class="notice"><b>Testmodus.</b> Ohne Datenbank – nur das Übungsblatt geht.</div>`;
+ if(!Z.online)return `<div class="notice"><b>Offline.</b> Kritzelclash spielt man zusammen – dafür brauchst du Internet. Das Übungsblatt geht trotzdem.</div>`;
+ if(!(Z.me&&Z.me.name))return `<div class="notice"><b>Noch kein Charakter.</b> Leg ihn im Hub an. <a href="../" style="color:var(--sky)">Zum Hub</a></div>`;
+ return '';
+}
+const VIEWS={
+loading(){return `<div class="loading"><div class="spinq">✏️</div><p class="muted">Stifte werden gespitzt …</p></div>`},
+menu(){
+ const st=Z.stand||neuStand();
+ const inv=Object.values(Z.invites).filter(r=>r.status==='lobby'&&!r.players.includes(Z.uid)&&Date.now()-(r.createdAt||0)<3600e3);
+ const lauf=Object.values(Z.myGames).filter(r=>(r.status==='lobby'||r.status==='laeuft')&&!(r.weg||[]).includes(Z.uid)).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+ return `<div class="hero"><div class="hero-logo">KRITZEL<span>CLASH</span></div><div class="kritzel">Einer malt, alle raten.</div></div>
+ ${noticeHTML()}
+ ${inv.map(r=>{const h=r.info[r.host]||{};return `<div class="row" style="margin-top:12px;border-color:var(--gold)">${avHTML(h)}<div class="mid"><div class="t1">${esc(h.name)} lädt dich ein!</div><div class="t2">Kritzel-Raum · ${r.players.length} Spieler</div></div><button class="btn small coral" data-a="beitreten" data-v="${esc(r.id)}">Rein da</button></div>`}).join('')}
+ ${lauf.map(r=>`<button class="row" style="margin-top:10px" data-a="oeffne" data-v="${esc(r.id)}"><span class="big" style="font-size:28px">${r.status==='lobby'?'🚪':'🎨'}</span><div class="mid"><div class="t1">${r.status==='lobby'?'Raum wartet':'Partie läuft'} · ${r.players.length} Spieler</div><div class="t2">${r.players.map(p=>esc((r.info[p]||{}).name)).join(', ')}</div></div><span class="tag go">Weiter</span></button>`).join('')}
+ <div class="modes">
+  <button class="mode wide" style="--g1:#FF7AC0;--g2:#9B3BD1;--sh:#5A1A7A" data-a="neuerRaum" ${!Z.online||DEMO?'disabled':''}><div><span class="big">🎨</span></div><div><h3>Neue Partie</h3><p>Raum aufmachen, Freunde einladen, losmalen. 2–8 Spieler.</p></div></button>
+  <button class="mode wide" style="--g1:#3D8BFF;--g2:#2753C9;--sh:#162F7A" data-a="uebung"><div><span class="big">📝</span></div><div><h3>Übungsblatt</h3><p>Alleine kritzeln und die Werkzeuge ausprobieren.</p></div></button>
+ </div>
+ <h2 class="sec">Deine Bilanz</h2>
+ <div class="stats"><div class="stat"><b>${st.siege}</b><span>Siege</span></div><div class="stat"><b>${st.spiele}</b><span>Partien</span></div><div class="stat"><b>${st.erraten}</b><span>Erraten</span></div><div class="stat"><b>${st.gemalt}</b><span>Gemalt</span></div><div class="stat"><b>${fmt(st.bestePunkte)}</b><span>Bestes Spiel</span></div><div class="stat"><b>${fmt(st.punkte)}</b><span>Hub-Punkte</span></div></div>
+ <h2 class="sec">So geht’s</h2>
+ <div class="empty" style="text-align:left">Reihum malt einer einen Begriff, den nur er kennt. Alle anderen tippen ihre Vermutung in den Chat. <b>Wer schneller rät, bekommt mehr Punkte</b>, der Zeichner bekommt für jeden Treffer 60. Mit der Zeit werden Buchstaben aufgedeckt. Ist ein Tipp „knapp daneben“, sagt dir das Spiel Bescheid.<br><b>Münzen:</b> Sieger 5 🪙, alle anderen 1 🪙.</div>
+ <div class="togs" style="display:grid;gap:8px;margin-top:12px"><button class="toggle${LS.get(KEY('ton'),true)?' on':''}" data-a="togTon" style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:16px;padding:12px 14px;width:100%;font-weight:900">🔊 Ton <span class="tag">${LS.get(KEY('ton'),true)?'an':'aus'}</span></button></div>`;
+},
+raum(){
+ const R=Z.R;if(!R)return VIEWS.loading();
+ const url=`${location.origin}${location.pathname}#tisch-${R.id}`;const host=R.host===Z.uid;
+ const freunde=Object.entries(Z.profiles).filter(([id,p])=>id!==Z.uid&&p&&p.name&&!R.players.includes(id)).sort((a,b)=>(Z.onlineIds.has(b[0])?1:0)-(Z.onlineIds.has(a[0])?1:0));
+ const slots=[...R.players.map(p=>`<div class="pslot">${p===R.host?'<span class="kr">👑</span>':''}${avHTML(R.info[p])}<span class="nm">${esc((R.info[p]||{}).name)}</span></div>`),...Array(Math.max(0,4-R.players.length)).fill('<div class="pslot leer"><span class="av">?</span><span class="nm">frei</span></div>')];
+ return `<div class="raum"><div class="ktop"><button class="ibtn" data-a="verlassenFrage" aria-label="Verlassen">‹</button><div class="qlabel" style="font-size:20px">Kritzel-Raum</div></div>
+ <h2 class="sec">Mitspieler <small>${R.players.length} / ${MAX_SPIELER}</small></h2><div class="pgrid">${slots.join('')}</div>
+ <h2 class="sec">Freunde einladen</h2>
+ <div class="list">${freunde.length?freunde.slice(0,12).map(([id,p])=>{const eing=(R.invited||[]).includes(id);return `<div class="row"><span class="avwrap"><span class="av" style="display:block;width:42px;height:42px;border-radius:50%;overflow:hidden">${avatarSVG(p.avatar)}</span>${Z.onlineIds.has(id)?'<i class="ondot"></i>':''}</span><div class="mid"><div class="t1">${esc(p.name)}</div><div class="t2">${Z.onlineIds.has(id)?'online':'nicht online'}</div></div><button class="btn small${eing?' ghost':''}" data-a="einladen" data-v="${esc(id)}" ${eing?'disabled':''}>${eing?'Eingeladen':'Einladen'}</button></div>`}).join(''):'<div class="empty">Alle Freunde sind schon drin – oder schick den Link.</div>'}</div>
+ <label class="lbl" for="invUrl">Oder Link schicken</label><input id="invUrl" class="inp" readonly value="${esc(url)}" style="font-size:13px">
+ <div class="acts" style="grid-template-columns:1fr 1fr"><button class="btn small" data-a="kopieren">📋 Kopieren</button><a class="btn small mint" href="https://wa.me/?text=${encodeURIComponent(`${myName()} lädt dich zu Kritzelclash ein! 🎨 ${url}`)}" target="_blank" rel="noopener">💬 WhatsApp</a></div>
+ <h2 class="sec">Einstellungen ${host?'':'<small>legt der Gastgeber fest</small>'}</h2>
+ <div class="lbl" style="margin-top:4px">Runden</div><div class="seg">${[2,3,4].map(n=>`<button class="${R.einst.runden===n?'on':''}" data-a="einst" data-k="runden" data-v="${n}" ${host?'':'disabled'}>${n}</button>`).join('')}</div>
+ <div class="lbl">Zeit zum Malen</div><div class="seg">${[60,90,120].map(n=>`<button class="${R.einst.zeit===n?'on':''}" data-a="einst" data-k="zeit" data-v="${n}" ${host?'':'disabled'}>${n} s</button>`).join('')}</div>
+ ${host?`<button class="btn big" data-a="starten" ${R.players.length<2?'disabled':''}>${R.players.length<2?'Warte auf Mitspieler …':'🎨 Los geht’s!'}</button>`:`<div class="empty" style="margin-top:16px">Warte, bis <b>${esc((R.info[R.host]||{}).name)}</b> startet …</div>`}</div>`;
+}
+};
+
+/* Spielansicht: Gerüst einmal bauen (Leinwand bleibt erhalten), dann Teile aktualisieren. */
+function spielGeruest(){
+ return `<div class="kc"><div class="main" style="display:grid;gap:10px;min-width:0">
+  <div class="ktop"><button class="ibtn" data-a="verlassenFrage" aria-label="Menü">‹</button><div class="wortbox" id="wort"></div><div class="zeit" id="zeit"><svg viewBox="0 0 46 46"><circle class="bg" cx="23" cy="23" r="19"/><circle class="fg" cx="23" cy="23" r="19" stroke-dasharray="119.4" stroke-dashoffset="0"/></svg><b id="zeitT"></b></div></div>
+  <div class="blatt" id="blatt"><canvas id="cv" width="1000" height="750" aria-label="Zeichenblatt"></canvas><div class="feed" id="feed" hidden></div><div id="ovl"></div></div>
+  <div id="werkzeuge"></div>
+ </div>
+ <div class="side" style="display:grid;gap:10px;min-width:0">
+  <div class="spieler" id="spieler"></div>
+  <div class="chat" id="chatbox"><div class="msgs" id="msgs"></div><form class="crow" id="rateForm"><input id="rateIn" class="inp" maxlength="80" autocomplete="off" placeholder="Dein Tipp …" aria-label="Dein Tipp"><button class="sendb" aria-label="Senden">➤</button></form>
+   <div class="emorow">${EMOJIS.map(e=>`<button class="emo" data-a="emo" data-v="${e}">${e}</button>`).join('')}</div></div>
+ </div></div>`;
+}
+function uebungGeruest(){
+ return `<div class="kc male" style="grid-template-columns:1fr"><div class="main" style="display:grid;gap:10px;min-width:0;max-width:900px;margin:0 auto;width:100%">
+  <div class="ktop"><button class="ibtn" data-a="zumMenu" aria-label="Zurück">‹</button><div class="wortbox ich">Übungsblatt</div></div>
+  <div class="blatt" id="blatt"><canvas id="cv" width="1000" height="750"></canvas></div><div id="werkzeuge"></div></div></div>`;
+}
+/* Werkzeugleiste: eine Zeile mit Farbknopf (klappt die Farben auf), Stift/Radierer/Füllen,
+   Pinselgröße (Schieberegler mit Vorschau), Rückgängig, Löschen, Vollbild.
+   Am großen Bildschirm sind die Farben immer offen. */
+function werkzeugeZeigen(){
+ const w=$('#werkzeuge');if(!w)return;
+ if(!ichZeichne()){w.innerHTML='';return}
+ const vf=Z.werkzeug==='radierer'?'#FFFFFF':Z.farbe;
+ w.innerHTML=`<div class="tools">
+  <div class="trow"><button class="tool farbknopf" data-a="palette" aria-label="Farbe wählen" title="Farbe"><i style="background:${Z.farbe}"></i></button>
+  ${[['stift','✏️','Stift'],['radierer','🧽','Radierer'],['fuellen','🪣','Füllen']].map(([k,i,n])=>`<button class="tool${Z.werkzeug===k?' on':''}" data-a="werkzeug" data-v="${k}" aria-label="${n}" title="${n}">${i}</button>`).join('')}
+  <label class="dicke" title="Pinselgröße"><span class="dv"><i id="dickeV" style="width:${dPunkt()}px;height:${dPunkt()}px;background:${vf}"></i></span><input id="dicke" type="range" min="${DICKE_MIN}" max="${DICKE_MAX}" value="${Z.groesse}" aria-label="Pinselgröße"></label>
+  <button class="tool" data-a="undo" aria-label="Rückgängig" title="Rückgängig">↩️</button><button class="tool" data-a="leeren" aria-label="Alles löschen" title="Alles löschen">🗑️</button>
+  ${document.fullscreenEnabled?`<button class="tool" data-a="vollbild" aria-label="Vollbild" title="Vollbild">⛶</button>`:''}</div>
+  <div class="farben${Z.palette?' offen':''}">${FARBEN.map(f=>`<button class="farbe${Z.farbe===f&&Z.werkzeug!=='radierer'?' on':''}" style="background:${f}" data-a="farbe" data-v="${f}" aria-label="Farbe ${f}"></button>`).join('')}</div></div>`;
+}
+/* Vorschau-Punkt: echte Pinselgröße im Verhältnis zur angezeigten Leinwand (mind. 3, max. 30 px). */
+function dPunkt(){const b=CV?CV.getBoundingClientRect().width/BW:.4;return Math.max(3,Math.min(30,Math.round(Z.groesse*(Z.werkzeug==='radierer'?1.6:1)*b)))}
+document.addEventListener('input',e=>{if(e.target.id!=='dicke')return;Z.groesse=+e.target.value;LS.set(KEY('dicke'),Z.groesse);const v=$('#dickeV');if(v){const p=dPunkt();v.style.width=v.style.height=p+'px'}});
+function zeichneSpiel(voll){
+ const R=Z.R;if(!R||!$('#cv'))return;
+ if(voll&&(!CV||CV!==$('#cv')))leinwandBauen();
+ const ichZ=R.zeichner===Z.uid;const ichOk=(R.erraten||[]).includes(Z.uid);
+ $('#blatt').classList.toggle('zuschauer',!ichZeichne());
+ const kc=document.querySelector('.kc');if(kc)kc.classList.toggle('male',ichZ&&R.phase==='malen');   // Handy: Zeichner ohne Chat-Fenster
+ /* Wort oben */
+ const w=$('#wort');
+ if(R.phase==='malen'&&ichZ){w.className='wortbox ich';w.innerHTML=`${esc((Z.wort||'?').toUpperCase())}<small>malen!</small>`}
+ else if(R.phase==='malen'){w.className='wortbox';const n=(R.hinweis||'').replace(/ /g,'').length;w.innerHTML=`${esc(R.hinweis||'')}<small>${ichOk?'✔ erraten':`(${n} Buchstaben)`}</small>`}
+ else if(R.phase==='aufloesung'){w.className='wortbox';w.textContent=R.aufloesung||''}
+ else {w.className='wortbox';w.innerHTML=`Runde ${R.runde} / ${R.einst.runden}`}
+ /* Overlay über der Leinwand */
+ const o=$('#ovl');const zinf=R.info[R.zeichner]||{};
+ if(R.phase==='wahl'){
+  if(ichZ){if(!Z.woerterWahl)Z.woerterWahl=WA.dreiWoerter(R.benutzt);
+   o.innerHTML=`<div class="overlay"><h3>Du bist dran! Was malst du?</h3><div class="wahl">${Z.woerterWahl.map((x,i)=>`<button class="btn${i===1?' mint':i===2?' coral':''}" data-a="wort" data-v="${esc(x)}">${esc(x)} <small>${['leicht','mittel','schwer'][i]}</small></button>`).join('')}</div></div>`}
+  else o.innerHTML=`<div class="overlay">${avHTML(zinf).replace('class="av"','class="av" style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:4px solid #fff;display:block"')}<h3>${esc(zinf.name)} sucht sich einen Begriff aus …</h3><p class="muted">Runde ${R.runde} von ${R.einst.runden}</p></div>`;
+ }else if(R.phase==='aufloesung'){
+  const zp=Object.entries(R.zugPunkte||{}).sort((a,b)=>b[1]-a[1]);
+  o.innerHTML=`<div class="overlay"><p class="muted" style="margin:0">Der Begriff war</p><div class="gross">${esc((R.aufloesung||'').toUpperCase())}</div>
+   <div class="zugliste">${zp.length?zp.map(([p,v])=>`<div><span>${esc((R.info[p]||{}).name)}${p===R.zeichner?' ✏️':''}</span><b>+${v}</b></div>`).join(''):'<div><span>Diesmal hat es keiner erraten 🙈</span></div>'}</div></div>`;
+ }else o.innerHTML='';
+ if(voll)werkzeugeZeigen();
+ /* Feed (nur Zeichner) und Chat-Eingabe */
+ const feed=$('#feed');feed.hidden=!(ichZ&&R.phase==='malen');
+ const inp=$('#rateIn');if(inp){inp.placeholder=ichZ&&R.phase==='malen'?'Du malst – schreib nur, was alle sehen dürfen 🤫':ichOk?'Erraten! Jetzt nur noch mit den anderen Wissenden 🤫':'Dein Tipp …';inp.classList.toggle('okay',ichOk)}
+ /* Spieler */
+ const sp=[...R.players].sort((a,b)=>((R.punkte||{})[b]||0)-((R.punkte||{})[a]||0));
+ $('#spieler').innerHTML=sp.map(p=>{const inf=R.info[p]||{};const ok=(R.erraten||[]).includes(p);const weg=(R.weg||[]).includes(p);
+  return `<div class="sp${p===R.zeichner?' zeichner':''}${ok?' ok':''}${weg?' weg':''}${p===Z.uid?' ich':''}">${avHTML(inf)}<div><div class="nm">${esc(inf.name)}</div><div class="pt">${fmt((R.punkte||{})[p]||0)}</div></div>${p===R.zeichner?'<span class="mk">✏️</span>':ok?'<span class="mk">✔</span>':''}</div>`}).join('');
+ zeichneChat();zeichneZeit();
+}
+function zeichneZeit(){
+ const R=Z.R;const t=$('#zeitT');if(!R||!t)return;const fg=document.querySelector('#zeit .fg');
+ const gesamt=R.phase==='malen'?R.einst.zeit*1000:R.phase==='wahl'?WAHL_ZEIT:AUFLOESUNG_ZEIT;
+ const rest=Math.max(0,R.phaseBis-Date.now());const s=Math.ceil(rest/1000);if(t.textContent!==String(s))t.textContent=s;
+ fg.style.strokeDashoffset=String(119.4*(1-rest/gesamt));$('#zeit').classList.toggle('knapp',R.phase==='malen'&&rest<10000);
+}
+function zeigeErgebnis(){
+ const R=Z.R;if(!R)return;clearInterval(Z.tick);
+ if(R.status==='abgebrochen'){toast('Der Raum wurde geschlossen.');verlasseRaum();return}
+ const erg=verbuche(R)||Z.letztesErg||null;Z.letztesErg=erg;renderTop();   // Münzen/Punkte oben sofort aktualisieren
+ const sc=aktive(R).map(p=>[p,(R.punkte||{})[p]||0]).sort((a,b)=>b[1]-a[1]);const ich=R.winner===Z.uid;
+ if(ich){confetti(120);ton('richtig')}
+ const pod=[1,0,2].map(i=>sc[i]?`<div class="pod p${i+1}">${avHTML(R.info[sc[i][0]])}<span class="nm">${esc((R.info[sc[i][0]]||{}).name)}</span><span class="sc">${fmt(sc[i][1])}</span><div class="blk">${['🥇','🥈','🥉'][i]}</div></div>`:'').join('');
+ document.body.classList.remove('full');
+ $('#view').innerHTML=`<div class="res"><h1>${R.winner==='remis'?'Unentschieden!':ich?'Du gewinnst!':`${esc((R.info[R.winner]||{}).name)} gewinnt!`}</h1>
+  <p class="lead">${erg?`+${fmt(erg.pts)} Hub-Punkte · <b style="color:var(--gold)">+${erg.coins} 🪙</b>`:'Partie vorbei'}</p>
+  <div class="podium">${pod}</div>
+  <div class="list" style="margin-top:14px;text-align:left">${sc.slice(3).map(([p,v],i)=>`<div class="row">${avHTML(R.info[p])}<div class="mid"><div class="t1">${i+4}. ${esc((R.info[p]||{}).name)}</div></div><span class="end">${fmt(v)}</span></div>`).join('')}</div>
+  <div class="acts"><button class="btn big" data-a="revanche">🔁 Nochmal mit allen</button><button class="btn ghost block" data-a="zumMenu">Zum Menü</button></div></div>`;
+ Z.view={name:'ergebnis'};
+}
+
+/* ---------- 7. Aktionen ---------- */
+const A={
+ neuerRaum(){raumAnlegen([])},
+ beitreten(ds){beitreten(ds.v)},
+ oeffne(ds){oeffneRaum(ds.v)},
+ uebung(){Z.uebung=true;Z.striche=[];Z.leinwand=0;go({name:'uebung'})},
+ zumMenu(){closeOverlay();Z.uebung=false;verlasseRaum()},
+ einladen(ds){Z.ref.update({invited:FV().arrayUnion(ds.v),updatedAt:Date.now()}).then(()=>toast('Eingeladen!')).catch(()=>toast('Einladen hat nicht geklappt.'))},
+ kopieren(){const i=$('#invUrl');try{navigator.clipboard.writeText(i.value).then(()=>toast('Link kopiert'),()=>{i.select();toast('Link markiert – jetzt kopieren')})}catch(e){i.select()}},
+ einst(ds){const R=Z.R;if(!R||R.host!==Z.uid)return;Z.ref.update({[`einst.${ds.k}`]:+ds.v,updatedAt:Date.now()})},
+ starten(){starten()},
+ wort(ds){wortWaehlen(ds.v)},
+ farbe(ds){Z.farbe=ds.v;Z.palette=false;if(Z.werkzeug==='radierer')Z.werkzeug='stift';werkzeugeZeigen()},
+ palette(){Z.palette=!Z.palette;werkzeugeZeigen()},
+ werkzeug(ds){Z.werkzeug=ds.v;werkzeugeZeigen()},
+ vollbild(){try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>toast('Vollbild geht auf diesem Gerät nicht.'))}catch(e){}},
+ undo(){rueckgaengig()},
+ leeren(){allesLoeschen()},
+ emo(ds){sendeEmoji(ds.v)},
+ togTon(){LS.set(KEY('ton'),!LS.get(KEY('ton'),true));render()},
+ verlassenFrage(){const R=Z.R;openOverlay(`<h3>Raum verlassen?</h3><p>${R&&R.status==='laeuft'?'Die anderen spielen ohne dich weiter. Für diese Partie bekommst du nichts.':'Du kannst jederzeit über den Link zurück, solange der Raum offen ist.'}</p><div class="acts"><button class="btn coral block" data-a="verlassen">Verlassen</button><button class="btn ghost block" data-a="closeOvl">Bleiben</button></div>`)},
+ verlassen(){raumVerlassen()},
+ revanche(){const R=Z.R;const andere=R?R.players.filter(p=>p!==Z.uid):[];verlasseRaum(true);raumAnlegen(andere)},
+ closeOvl(){closeOverlay()},
+ ovlBg(ds,el,e){if(e.target===el)closeOverlay()}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;const f=A[el.dataset.a];if(f)f(el.dataset,el,e)});
+document.addEventListener('submit',e=>{if(e.target.id!=='rateForm')return;e.preventDefault();const i=$('#rateIn');raten(i.value);i.value='';i.focus()});
+document.addEventListener('pointerdown',e=>{if(e.target.id==='cv')stiftAn(e)});
+document.addEventListener('pointermove',e=>{if(Z.strich)stiftBewegt(e)},{passive:false});
+['pointerup','pointercancel','pointerleave'].forEach(t=>document.addEventListener(t,e=>{if(Z.strich&&(t!=='pointerleave'||e.target.id==='cv'))stiftAus()}));
+
+/* ---------- 8. Start ---------- */
+async function boot(){
+ const c=LS.get(PROFILE_KEY,null);Z.me=c&&c.name?c:null;render();
+ const fb=DEMO?null:await HubFirebase.start();
+ if(fb){Z.online=true;Z.fs=fb.fs;Z.uid=fb.uid;
+  try{const s=await Z.fs.doc('profiles/'+Z.uid).get();if(s.exists&&s.data().name)Z.me={...(Z.me||{}),...s.data()}}catch(e){}
+  Z.fs.collection('profiles').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());Z.profiles=m;if(Z.view.name==='menu'||Z.view.name==='raum')render()},()=>{});
+  HubFirebase.presence(Z.fs,Z.uid,ids=>{Z.onlineIds=ids;if(Z.view.name==='menu'||Z.view.name==='raum')render();else renderTop()});
+ }
+ await ladeStand();
+ if(Z.online){
+  Z.fs.collection(PFAD).where('players','array-contains',Z.uid).onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});Z.myGames=m;if(Z.view.name==='menu')render()},()=>{});
+  Z.fs.collection(PFAD).where('invited','array-contains',Z.uid).onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});
+   for(const r of Object.values(m))if(!Z.invites[r.id]&&r.status==='lobby'&&!r.players.includes(Z.uid)&&Date.now()-(r.createdAt||0)<3600e3){const h=r.info[r.host]||{};toast(`${h.name} lädt dich zu Kritzelclash ein!`,{av:h.avatar,ms:7000})}
+   Z.invites=m;if(Z.view.name==='menu')render()},()=>{});
+ }
+ const h=(location.hash||'').replace(/^#/,'');
+ if(h.startsWith('tisch-')&&Z.online){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  const id=h.slice(6);if(/^[a-z0-9]{6,40}$/i.test(id)){const s=await Z.fs.doc(`${PFAD}/${id}`).get().catch(()=>null);
+   if(s&&s.exists&&s.data().players.includes(Z.uid)){oeffneRaum(id);return}go({name:'menu'});beitreten(id);return}}
+ go({name:'menu'});
+}
+boot();
+</script>
+</body>
+</html>
