@@ -24,6 +24,9 @@
                p = gemeinsames Profil, s = eigener Spielstand dieses Spiels ({} wenn keiner).
                Zählt für die Gesamtpunkte, das Hub-Level und die Rangliste.
      werte(p, s)  Funktion: Liste [Wert, Beschriftung] für die Profilseite (3 oder 6 Stück).
+     muenzen(p, s) Funktion: Münzen, die der Spieler in diesem Spiel verdient hat (optional).
+     siege(p, s)   Funktion: Siege in diesem Spiel (optional, für Hub-Erfolge).
+     live      true = hat Live-Partien unter partien/{id}/liste (Herausforderungen im Hub).
 
    Warum eigene Spielstand-Dokumente? Brainclash speichert beim Sichern immer
    sein ganzes Profil-Dokument neu. Würde ein anderes Spiel seine Werte auch
@@ -43,6 +46,8 @@ const GAMES=[
   farbe:['#FF6B57','#E2365A','#8F1C33'],
   /* Brainclash speichert seine Werte direkt im Profil (points, wins, …). */
   punkte:p=>p.points||0,
+  muenzen:p=>p.muenzen||0,
+  siege:p=>p.wins||0,
   werte:p=>[
    [fmt(p.points),'Punkte'],
    [p.wins||0,'Siege'],
@@ -51,6 +56,24 @@ const GAMES=[
    [fmt(p.bestMath),'Rechnen'],
    [p.losses||0,'Niederlagen']
   ]
+ },
+ {
+  id:'wuerfelclash',
+  name:'Würfelclash',
+  emoji:'🎲',
+  pfad:'wuerfelclash/',
+  status:'live',
+  kurz:'Würfeln nach den Original-Kniffel-Regeln mit 3D-Würfeln. Live gegen Freunde, gegen den Bot oder am Tisch.',
+  tags:['⚡ Live-Duell','🤖 Bot','🛋️ Am Tisch','💡 Tipps'],
+  farbe:['#22C98A','#11865E','#0A4F37'],
+  spielstand:true,
+  /* live: true = das Spiel hat Live-Partien unter partien/{id}/liste.
+     Der Hub zeigt dann Herausforderungen an dich auf der Startseite. */
+  live:true,
+  punkte:(p,s)=>s.punkte||0,
+  muenzen:(p,s)=>s.muenzen||0,
+  siege:(p,s)=>s.siege||0,
+  werte:(p,s)=>[[fmt(s.punkte),'Punkte'],[s.siege||0,'Siege'],[fmt(s.rekord),'Rekord'],[s.spiele||0,'Spiele'],[s.fuenfer||0,'Fünferpasch'],[s.niederlagen||0,'Niederlagen']]
  }
  /* Nächstes Spiel hier anhängen, z. B.:
  ,{
@@ -71,3 +94,8 @@ const standOf=(g,uid)=>(STAND[g.id]&&STAND[g.id][uid])||{};
 const gamePoints=(g,p,uid)=>Number(g.punkte(p||{},standOf(g,uid)))||0;
 /* Gesamtpunkte eines Spielers über alle Spiele. */
 const totalPoints=(p,uid)=>GAMES.reduce((s,g)=>s+gamePoints(g,p,uid),0);
+/* Münzen (Hub-Währung) über alle Spiele. Jedes Spiel sagt mit muenzen(p,s), wie viele es vergeben hat.
+   Regel überall gleich: nur für Duelle gegen Freunde, Sieg 5, sonst 1. */
+const totalMuenzen=(p,uid)=>GAMES.reduce((s,g)=>s+(g.muenzen?Number(g.muenzen(p||{},standOf(g,uid)))||0:0),0);
+/* Siege über alle Spiele (für Erfolge). */
+const totalSiege=(p,uid)=>GAMES.reduce((s,g)=>s+(g.siege?Number(g.siege(p||{},standOf(g,uid)))||0:0),0);

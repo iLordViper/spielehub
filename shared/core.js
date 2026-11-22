@@ -150,10 +150,11 @@ const hubTitleFor=L=>{let t=HUB_TITLES[0][1];for(const [l,n] of HUB_TITLES)if(L>
 
 /* ---------- 4. Meldungen & Fenster ---------- */
 const bulbs=n=>'<b></b>'.repeat(n);
-/* toast(text, {av, ms}) – kurze Meldung oben. av = Avatar-Objekt (optional). */
+/* toast(text, {av, ms, link:{href,label}}) – kurze Meldung oben.
+   av = Avatar-Objekt (optional), link = Knopf in der Meldung (optional). */
 function toast(text,opt={}){
  const box=$('#toasts');if(!box)return;const t=document.createElement('div');t.className='toast';
- t.innerHTML=`${opt.av?`<div class="av">${avatarSVG(opt.av)}</div>`:''}<div class="tx">${esc(text)}</div>`;
+ t.innerHTML=`${opt.av?`<div class="av">${avatarSVG(opt.av)}</div>`:''}<div class="tx">${esc(text)}</div>${opt.link?`<a class="btn small" style="min-height:38px;padding:6px 12px;font-size:15px" href="${esc(opt.link.href)}">${esc(opt.link.label)}</a>`:''}`;
  box.appendChild(t);t.addEventListener('click',()=>t.remove());setTimeout(()=>t.remove(),opt.ms||4200);
 }
 /* openOverlay(html) – Fenster in der Bildschirmmitte. Ein Klick daneben schließt es. */
