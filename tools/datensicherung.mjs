@@ -13,7 +13,7 @@
    ========================================================================== */
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 const KEY='AIzaSyAsPXT4DURd4zJIAr1WJnGx0qdUYKOsD4I',PROJ='brainclash-7f1b0';
-const SPIELE=['brainclash','wuerfelclash'];             // bei neuen Spielen ergänzen
+const SPIELE=['brainclash','wuerfelclash','kritzelclash']; // bei neuen Spielen ergänzen (Zeichenstriche werden nicht gesichert)
 const BASE=`https://firestore.googleapis.com/v1/projects/${PROJ}/databases/(default)/documents`;
 const HDR={'Content-Type':'application/json','Referer':'http://localhost:8080/'};
 const fromV=v=>'nullValue' in v?null:'booleanValue' in v?v.booleanValue:'integerValue' in v?Number(v.integerValue):'doubleValue' in v?v.doubleValue:'stringValue' in v?v.stringValue:'timestampValue' in v?v.timestampValue:'arrayValue' in v?(v.arrayValue.values||[]).map(fromV):'mapValue' in v?Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,fromV(x)])):null;
