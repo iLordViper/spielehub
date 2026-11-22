@@ -7,7 +7,7 @@ Spiel 3 im Hub: Einer malt, alle anderen raten. 2–8 Freunde, live.
 | Datei | Zweck |
 |---|---|
 | `kritzelclash/index.html` | Das Spiel: Menü, Raum, Leinwand, Werkzeuge, Rate-Chat, Ergebnis, Übungsblatt |
-| `kritzelclash/woerter.js` | 265 Begriffe (leicht/mittel/schwer), Rate-Prüfung, „knapp daneben“, Hinweis-Buchstaben |
+| `kritzelclash/woerter.js` | 752 Begriffe (leicht/mittel/schwer, inkl. Redewendungen), Rate-Prüfung, „knapp daneben“, Hinweis-Buchstaben |
 | `kritzelclash/woerter.test.js` | Prüft die Wortliste: `node kritzelclash/woerter.test.js` |
 
 ## Ablauf
