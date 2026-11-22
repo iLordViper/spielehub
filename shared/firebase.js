@@ -44,10 +44,14 @@ const HubFirebase={
    await Promise.all([this._load(`https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js`),this._load(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`)]);
    if(!firebase.apps.length)firebase.initializeApp(HUB_FIREBASE_CONFIG);
    const auth=firebase.auth();
-   const user=await new Promise(res=>{let done=false;const fin=u=>{if(!done){done=true;res(u)}};
+   /* Warten auf die anonyme Anmeldung. Nach 25 s geht die Seite erst mal offline.
+      Kommt die Anmeldung danach doch noch an (langsames Netz, gebremster Tab),
+      lädt die Seite sich EINMAL neu und ist dann online. */
+   const user=await new Promise(res=>{let done=false;const fin=u=>{if(!done){done=true;res(u)}else if(u){try{if(!sessionStorage.getItem('hub_spaet')){sessionStorage.setItem('hub_spaet','1');location.reload()}}catch(e){}}};
     auth.onAuthStateChanged(u=>{if(u)fin(u);else auth.signInAnonymously().catch(e=>{console.error(e);this.error=e.code||e.message;fin(null)})});
-    setTimeout(()=>fin(null),15000)});
+    setTimeout(()=>fin(null),25000)});
    if(!user)return null;
+   try{sessionStorage.removeItem('hub_spaet')}catch(e){}
    return{fs:firebase.firestore(),uid:user.uid};
   }catch(e){console.error(e);this.error=this.error||'load';return null}
  },
