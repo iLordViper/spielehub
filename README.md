@@ -29,6 +29,7 @@ Hauptprofil über alle Spiele: Level, Hub-Punkte, **Münzen 🪙** (Sieg 5, sons
 | `shared/erfolge.js` | Hub-Erfolge (aus allen Spielen berechnet) |
 | `brainclash/index.html` | Das Quiz (eine Datei, wie bisher) |
 | `wuerfelclash/` | Das Würfelspiel: `index.html`, `regeln.js` (+ Test), `sounds/` |
+| `tools/datensicherung.mjs` | Sichert alle Spielerdaten aus der Datenbank als JSON auf diesen PC |
 | `tools/handy-vorschau.html` | Seite in Handygröße ansehen (`…/tools/handy-vorschau.html?seite=wuerfelclash/?demo`) |
 | `firestore.rules` | Sicherheitsregeln der Datenbank (Kopie dessen, was in Firebase eingestellt ist) |
 | `tools/lokal-testen.js` | Kleiner Webserver zum Testen auf dem PC |
@@ -50,6 +51,16 @@ node tools/lokal-testen.js
 Dann `http://localhost:8080/?demo` öffnen. **`?demo` ist wichtig:** Der Hub läuft dann ohne Datenbank mit Beispielspielern, und nichts landet bei deinen Freunden. Brainclash selbst hat keinen Testmodus und benutzt auch lokal immer die echte Datenbank.
 
 ## Sicherungen
+
+**Spielerdaten aus der Datenbank sichern** (liest nur, ändert nichts):
+
+```powershell
+node tools/datensicherung.mjs
+```
+
+Legt `Documents\spielehub-sicherungen\daten-<Datum_Uhrzeit>\` mit einer JSON-Datei je Sammlung an. Vor größeren Updates ausführen. Bei neuen Spielen die Liste `SPIELE` im Werkzeug ergänzen.
+
+Weitere Sicherungen:
 
 `Documents\spielehub-sicherungen\` enthält den Stand vor dem Hub (22.11.2026):
 - `github-version\` – die damalige `index.html`, `README.md`, `firestore.rules` und das komplette Git-Repo als `brainclash-repo.bundle`
