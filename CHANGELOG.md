@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.2.1 – 22.11.2026 – Mehr Begriffe für Kritzelclash
+
+- Wortliste von 265 auf 752 Begriffe erweitert: mehr Tiere und Essen, Fahrzeuge, Musikinstrumente, Haushalt, Natur & Wetter, Orte & Sehenswürdigkeiten, Märchen & Fantasy, Berufe, Sport & Spiele, Tätigkeiten & Gefühle, Feiertage & Jahreszeiten und 20 Redewendungen („Schwein haben“, „Tomaten auf den Augen“ …).
+- Aufteilung: 159 leicht, 416 mittel, 177 schwer. Der Test prüft weiter auf doppelte Begriffe.
+
 ## 1.2.0 – 22.11.2026 – Kritzelclash
 
 **Neues Spiel: Kritzelclash** (`kritzelclash/`, Doku: `docs/kritzelclash.md`)
