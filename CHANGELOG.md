@@ -1,5 +1,14 @@
 # Änderungen
 
+## 1.2.2 – 22.11.2026 – Kritzelclash: Chat, Querformat, kompakte Werkzeuge
+
+- **Chat für alle:** Warteraum-Chat; Zeichner kann schreiben (schmale Chat-Zeile hochkant, 💬-Knopf mit Zähler für den Verlauf), das gesuchte Wort wird dabei blockiert; Rater-Chat kompakter.
+- **Querformat:** Handy drehen → Leinwand in voller Höhe, Werkzeuge als schmale Spalte, Wort/Zeit als Plakette auf dem Bild. Rater quer: Bild links, Spieler und Chat rechts.
+- **Mehr Malfläche:** quer rund 15 % größer als vorher (Kopfzeile schwebt über dem Bild).
+- **Kompakte Werkzeuge:** Farbknopf und Größenknopf öffnen kleine Auswahlfenster (16 Farben, 7 Größen) statt Farbreihe und Schieberegler; ⟲-Knopf für Quer + Vollbild.
+- `tools/handy-vorschau.html` kann jetzt auch quer (`&quer=1`).
+- Live mit zwei Test-Spielern geprüft (Warteraum-Chat, Zeichner-Chat, Wort-Sperre, Zähler), Testdaten gelöscht.
+
 ## 1.2.1 – 22.11.2026 – Mehr Begriffe für Kritzelclash
 
 - Wortliste von 265 auf 752 Begriffe erweitert: mehr Tiere und Essen, Fahrzeuge, Musikinstrumente, Haushalt, Natur & Wetter, Orte & Sehenswürdigkeiten, Märchen & Fantasy, Berufe, Sport & Spiele, Tätigkeiten & Gefühle, Feiertage & Jahreszeiten und 20 Redewendungen („Schwein haben“, „Tomaten auf den Augen“ …).
