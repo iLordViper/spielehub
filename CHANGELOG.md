@@ -24,6 +24,12 @@
 **Datenbank** (`firestore.rules`, in Firebase veröffentlicht)
 - Neu: `spielstand/{spiel}/spieler/{uid}`, `partien/{spiel}/liste/{id}` und deren `chat`.
 
+**Live-Test am 22.11.2026** (zwei Test-Spieler über die echte Datenbank)
+- Geprüft: Herausforderung erscheint im Hub, Annehmen, Beitritt, Würfe live beim Gegner, Chat mit Sprechblase und Ungelesen-Zähler, Eintragen, Aufgeben, Münze +1 und Niederlage gespeichert.
+- Behoben: Kam die Firebase-Anmeldung später als 15 s (gebremster Tab, langsames Netz), blieb die Seite offline. Jetzt 25 s Wartezeit und danach einmaliges Neuladen, sobald die Anmeldung doch klappt (`shared/firebase.js`).
+- Behoben: Ergebnis nach Aufgabe zeigte „Ohne Wertung“ und den Aufgebenden oben. Jetzt „Zählt als Niederlage“ und der Sieger oben.
+- Testdaten gelöscht (Profile, Spielstand, Partie). Zwei Test-Chatnachrichten liegen noch unsichtbar in der Datenbank, weil Chats absichtlich nicht löschbar sind.
+
 ## 1.0.0 – 22.11.2026 – Der Hub entsteht
 
 Veröffentlicht am 22.11.2026 im neuen Repo `iLordViper/spielehub`, live unter https://ilordviper.github.io/spielehub/. Alle 14 Dateien auf GitHub sind mit dem lokalen Stand verglichen (identisch).
