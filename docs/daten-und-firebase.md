@@ -27,6 +27,7 @@ Wer Browserdaten löscht, im privaten Fenster spielt oder das Gerät wechselt, b
 | `spielstand/{spiel}/spieler/{uid}` | Spielstand je Spiel (z. B. Würfelclash: Punkte, Münzen, Siege, Rekord) | das jeweilige Spiel, nur der Spieler selbst |
 | `partien/{spiel}/liste/{id}` | Live-Partien (z. B. Würfelclash-Duelle) | Mitspieler |
 | `partien/{spiel}/liste/{id}/chat/{msg}` | Chat einer Partie | Mitspieler, nur unter eigenem Namen; nie gelöscht |
+| `partien/{spiel}/liste/{id}/zuege/{zug}/striche/{s}` | Zeichenstriche (Kritzelclash) | Mitspieler (anlegen, löschen für Rückgängig) |
 
 ## Hauptprofil: Level, Münzen, Erfolge
 
@@ -41,6 +42,7 @@ Wer Browserdaten löscht, im privaten Fenster spielt oder das Gerät wechselt, b
 | `ka_profile` | Kopie des eigenen Profils (Hub und Brainclash teilen sie) |
 | `ka_bot`, `ka_sound`, `ka_read` | Brainclash |
 | `wc_stand`, `wc_lokal`, `wc_tipps`, `wc_ton` | Würfelclash: Statistik-Kopie, laufende lokale Partie, Einstellungen |
+| `kc_stand`, `kc_dicke`, `kc_ton`, `kc_wort_*` | Kritzelclash: Statistik-Kopie, Pinselgröße, Ton, eigener Begriff (falls die Seite beim Malen neu lädt) |
 | `hub_demo_profile`, `wc_demo_*` | Nur Testmodus `?demo` – absichtlich getrennt |
 
 ## Regeln ändern
