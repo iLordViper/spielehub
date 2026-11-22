@@ -781,10 +781,11 @@ function zeigeErgebnis(){
  if(W.view.name==='ergebnis'&&W.resultFor===G.id)return;W.resultFor=G.id;   // nicht doppelt zeigen
  W.lastPts=W.ptsFor&&W.ptsFor[G.id]!=null?W.ptsFor[G.id]:null;
  const coins=W.coinsFor&&W.coinsFor[G.id]||0;
- const sc=G.players.map(id=>[id,gesamt(G,id)]).sort((a,b)=>b[1]-a[1]);
+ /* Reihenfolge: nach Punkten – bei Aufgabe steht der Sieger trotzdem oben. */
+ const sc=G.players.map(id=>[id,gesamt(G,id)]).sort((a,b)=>(G.status==='abgebrochen'&&G.winner?(b[0]===G.winner)-(a[0]===G.winner):0)||b[1]-a[1]);
  const me=G.mode==='live'?W.uid:G.players[0];
  let titel,sub,emo;
- if(G.status==='abgebrochen'){titel=G.aufgegeben===me?'Aufgegeben':G.aufgegeben?'Gegner hat aufgegeben':'Partie beendet';sub=G.winner===me?'Der Sieg geht an dich.':'Ohne Wertung.';emo=G.winner===me?'🏆':'🏳️'}
+ if(G.status==='abgebrochen'){titel=G.aufgegeben===me?'Aufgegeben':G.aufgegeben?'Gegner hat aufgegeben':'Partie beendet';sub=G.winner===me?'Der Sieg geht an dich.':G.aufgegeben===me?'Zählt als Niederlage.':'Ohne Wertung.';emo=G.winner===me?'🏆':'🏳️'}
  else if(G.players.length===1){titel=`${sc[0][1]} Punkte`;sub=sc[0][1]>=(W.stand?W.stand.rekord:0)?'Neuer Rekord!':`Rekord: ${W.stand?W.stand.rekord:0}`;emo='🎯'}
  else if(G.winner==='remis'){titel='Unentschieden!';sub='Gleich viele Punkte.';emo='🤝'}
  else{const wi=G.info[G.winner]||{};const ich=G.winner===me&&G.mode!=='tisch';titel=ich?'Gewonnen!':G.mode==='tisch'?`${wi.name} gewinnt!`:`${wi.name} gewinnt`;sub=ich?'Starke Würfe!':'Nächstes Mal!';emo=ich||G.mode==='tisch'?'🏆':'😵'}
