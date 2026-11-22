@@ -33,7 +33,20 @@ Werte stehen in `PUNKTE` und `MUENZEN` oben im Skript.
 
 ## Zeichner-Ansicht (Handy)
 
-Möglichst viel Platz: Leinwand randlos über die ganze Breite, keine Spielerleiste und kein Chat-Fenster. Die Tipps der anderen schweben als Sprechblasen unten auf der Leinwand. Werkzeuge in einer Zeile: Farbe (klappt auf), Stift, Radierer, Füllen, **Pinselgröße als Schieberegler** (2–60, mit Vorschau, wird gemerkt), Rückgängig, Alles löschen, Vollbild (wo das Handy es kann). Am großen Bildschirm steht der Chat rechts daneben.
+Möglichst viel Malfläche:
+- **Hochkant:** Leinwand randlos über die ganze Breite, keine Spielerleiste. Darunter eine kompakte Werkzeugleiste und eine schmale **Chat-Zeile** zum Schreiben an alle.
+- **Quer (Handy drehen):** Leinwand in voller Bildschirmhöhe, Wort und Zeit schweben als Plakette darüber, Werkzeuge als schmale Spalte rechts.
+- **Werkzeugleiste:** Farbknopf (öffnet die 16 Farben), Größenknopf (öffnet 7 Pinselgrößen, wird gemerkt), Stift, Radierer, Füllen, Rückgängig, Alles löschen, ⟲ Quer + Vollbild (Android dreht und geht ins Vollbild; iPhone erlaubt das Webseiten nicht – dort erscheint der Hinweis, das Handy zu drehen).
+- Tipps der anderen schweben als Sprechblasen unten auf der Leinwand. Der **💬-Knopf** (mit Zähler für Neues) öffnet den ganzen Chat-Verlauf.
+- Der Zeichner darf mit allen schreiben – nur nicht das gesuchte Wort („Das würde das Wort verraten“).
+
+Am großen Bildschirm steht der Chat rechts neben der Leinwand.
+
+## Chat
+
+- **Warteraum:** eigener Chat, damit man sich vor dem Start unterhalten kann. Was man tippt, bleibt stehen, wenn jemand beitritt.
+- **Rater:** kompaktes Chat-Fenster direkt unter der Leinwand (quer: rechts daneben). Tipps und normale Nachrichten gehen in dasselbe Feld.
+- Wer schon erraten hat, schreibt „geheim“ (🤫) – das sehen nur der Zeichner und die anderen, die es wissen.
 
 ## Technik
 
