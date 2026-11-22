@@ -65,13 +65,16 @@ if (fb) {
 
 Gibt es noch kein Profil (neuer Spieler kommt direkt über den Spiel-Link), schick ihn zum Hub: `location.href = '../'`. Dort legt er seinen Charakter an.
 
-## 5. Datenbank-Regeln freischalten (nur beim ersten neuen Spiel)
+## 5. Datenbank-Regeln
 
-1. In `firestore.rules` den Block `match /spielstand/{spiel}/spieler/{uid}` einkommentieren (die `//` entfernen).
-2. [Firebase-Konsole](https://console.firebase.google.com/) → Projekt **brainclash-7f1b0** → Firestore → **Regeln**.
-3. Den kompletten Inhalt von `firestore.rules` einfügen und **Veröffentlichen**.
+Seit Würfelclash sind die Regeln für `spielstand/{spiel}/…` und `partien/{spiel}/…` (Live-Partien mit Chat) für **alle** Spiele freigeschaltet. Ein neues Spiel braucht nur dann neue Regeln, wenn es andere Sammlungen benutzt. Dann: `firestore.rules` ändern, in der [Firebase-Konsole](https://console.firebase.google.com/) → **brainclash-7f1b0** → Firestore → **Regeln** einfügen und **Veröffentlichen**.
 
-Ohne diesen Schritt lehnt die Datenbank das Speichern ab.
+## 5b. Münzen, Erfolge, Live-Duelle
+
+- **Münzen**: nur für Duelle gegen Freunde, Sieg 5, sonst 1. Im Spielstand als `muenzen` speichern und in `games.js` `muenzen:(p,s)=>s.muenzen||0` angeben.
+- **Siege** für die Hub-Erfolge: `siege:(p,s)=>s.siege||0`.
+- **Erfolge** fürs Hauptprofil: Zeile in `shared/erfolge.js` ergänzen.
+- **Live-Duelle**: Partien unter `partien/<kennung>/liste/<id>` mit `players`, `host`, `invited`, `status` ('warten' → 'laeuft' → 'fertig'). Mit `live:true` in `games.js` zeigt der Hub Herausforderungen an. Würfelclash ist die Vorlage (Abschnitt „Live-Duell“ und „Chat“ in `wuerfelclash/index.html`).
 
 ## 6. Im Hub eintragen
 
