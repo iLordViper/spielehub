@@ -93,15 +93,17 @@ body.full #view{padding-top:8px}
 .groesse.on{border-color:var(--gold)}
 .sep{width:2px;height:30px;background:var(--line);margin:0 2px}
 
-/* Farbknopf + Pinselgröße */
-.farbknopf i{display:block;width:24px;height:24px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3)}
-.dicke{flex:1;min-width:120px;display:flex;align-items:center;gap:8px;height:44px;padding:0 10px;border-radius:12px;background:var(--surface-2)}
-.dicke .dv{flex:none;width:32px;height:32px;display:grid;place-items:center}
-.dicke .dv i{display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 0 2px rgba(255,255,255,.25)}
-.dicke input{flex:1;min-width:0;accent-color:var(--gold);height:28px}
-.farben{display:none;flex-wrap:wrap}
-.farben.offen{display:flex}
-@media (min-width:900px){.farben{display:flex}.farbknopf{display:none!important}}
+/* Kompakte Leiste: Farb- und Größenknopf öffnen je ein kleines Auswahlfenster (.pop) über der Leinwand. */
+.tools{position:relative}
+.knopf .fk{display:block;width:24px;height:24px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.knopf .gk{display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 0 2px rgba(255,255,255,.3)}
+.pop{position:absolute;z-index:20;left:0;right:0;bottom:calc(100% + 8px);display:flex;flex-wrap:wrap;gap:8px;padding:10px;border-radius:16px;background:var(--surface);border:2px solid var(--gold);box-shadow:0 12px 30px rgba(0,0,0,.5);animation:popIn .18s ease-out}
+@keyframes popIn{from{transform:translateY(8px) scale(.96);opacity:0}}
+.pop .farbe{width:34px;height:34px}
+.grpop{justify-content:space-between}
+.gr{width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;border:2px solid transparent}
+.gr.on{border-color:var(--gold)}
+.gr i{display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
 
 /* ---------- Rate-Feed: Tipps schweben als Blasen unten AUF der Leinwand (nur Zeichner) ---------- */
 .feed{position:absolute;left:8px;right:8px;bottom:8px;z-index:2;max-height:48%;overflow:hidden;display:flex;flex-wrap:wrap-reverse;align-content:flex-start;gap:6px;pointer-events:none}
@@ -147,6 +149,24 @@ body.full #view{padding-top:8px}
 .sendb{flex:none;width:48px;height:48px;border-radius:14px;background:var(--gold);color:#2A1700;font-size:20px;box-shadow:0 4px 0 var(--gold-deep);display:grid;place-items:center}
 .inp.okay{border-color:var(--mint)}
 
+/* ---------- Chat für den Zeichner am Handy ----------
+   💬-Knopf oben öffnet das Chat-Fenster von unten (über den Werkzeugen), ✕ schließt es.
+   Am großen Bildschirm steht der Chat immer rechts, Knopf und Kopfzeile sind dort aus. */
+#chatBtn{display:none}
+.schnell{display:none}
+.cbadge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;border-radius:10px;background:var(--coral);color:#fff;font-size:10.5px;font-style:normal;font-weight:900;display:grid;place-items:center;padding:0 5px;border:2px solid var(--bg)}
+.chatkopf{display:none;align-items:center;justify-content:space-between;font-family:var(--font-display);font-size:20px}
+.chatkopf b{font-weight:400}
+@media (max-width:899px){
+  .kc.male #chatBtn{display:grid}
+  .kc.male .schnell{display:flex;order:5}
+  .kc.male.chatoffen .chat{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;max-height:62svh;border-radius:22px 22px 0 0;border-bottom:0;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));box-shadow:0 -12px 30px rgba(0,0,0,.5);animation:hoch .25s ease-out}
+  .kc.male.chatoffen .chatkopf{display:flex}
+  .kc.male.chatoffen .msgs{height:auto;min-height:120px;flex:1}
+}
+@keyframes hoch{from{transform:translateY(40%);opacity:.5}}
+
 /* ---------- Handy (unter 900 px) ----------
    Eine Spalte in dieser Reihenfolge: Wort & Zeit → Spielerleiste → Leinwand →
    Werkzeuge (Zeichner) / Chat mit Eingabe (Rater) → Sprechblasen.
@@ -160,12 +180,14 @@ body.full #view{padding-top:8px}
   .kc.male .blatt{margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));border-radius:0}
   .kc.male .blatt::before,.kc.male .blatt::after{display:none}
   .kc.male .ktop .ibtn{width:36px;height:36px}
-  .tools .trow{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px}
+  .tools .trow{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;justify-content:space-between}
   .tools .trow::-webkit-scrollbar{display:none}
-  .tools .tool{min-width:36px;width:36px;height:40px;padding:0;font-size:17px}
-  .dicke{min-width:70px;padding:0 6px;gap:4px;height:40px}.dicke .dv{width:24px;height:24px}
+  .tools .tool{min-width:38px;width:38px;height:40px;padding:0;font-size:17px}
+  .pop{left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px))}
   .kc.male .tools{margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));border-radius:0;border-left:0;border-right:0;padding:6px max(8px,env(safe-area-inset-left,0px))}
-  .farben{gap:6px}
+  /* Rater: kompakter Chat */
+  .chat{padding:8px;gap:6px}.chat .emo{width:36px;height:36px;font-size:19px;border-radius:11px}
+  .crow .inp{min-height:44px;padding:9px 12px}.sendb{width:44px;height:44px}
   .spieler{gap:6px;padding-bottom:2px}
   .sp{padding:3px 8px 3px 3px;gap:6px}.sp .av{width:28px;height:28px}.sp .nm{font-size:11.5px;max-width:80px}.sp .pt{font-size:14px}
   .msgs{height:clamp(110px,24vh,220px)}
@@ -177,9 +199,43 @@ body.full #view{padding-top:8px}
   .sep{display:none}
   .feed{min-height:60px}
 }
-/* Querformat am Handy: Leinwand nicht höher als der Bildschirm. */
-@media (max-height:520px) and (orientation:landscape){
-  .blatt{max-width:calc((100svh - 70px) * 4 / 3);margin:0 auto;width:100%}
+/* ---------- Querformat am Handy (gedreht) ----------
+   Links die Leinwand in voller Höhe, rechts eine Spalte: Spieler, Werkzeuge bzw. Chat.
+   Gilt für Zeichner UND Rater. Die Kopfzeile (Wort, Zeit) liegt schmal darüber. */
+@media (orientation:landscape) and (max-height:560px){
+  body.full #view{padding-block:6px calc(6px + env(safe-area-inset-bottom,0px))}
+  /* --bh = verfügbare Höhe für die Leinwand; Breite = 4/3 davon, aber Platz für die rechte Spalte lassen. */
+  .kc{--bh:calc(100svh - 62px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));--bw:min(calc(var(--bh) * 4 / 3),calc(100vw - 260px));
+    display:grid!important;grid-template-columns:var(--bw) minmax(0,1fr)!important;grid-template-rows:auto auto auto minmax(0,1fr);gap:6px 10px;align-items:start}
+  .kc .main,.kc .side{display:contents}
+  .ktop{grid-column:1/-1;grid-row:1}
+  .ktop .ibtn{width:34px;height:34px}.zeit,.zeit svg{width:38px;height:38px}
+  .wortbox{font-size:20px}
+  .blatt{grid-column:1;grid-row:2/5;width:var(--bw);height:auto;margin:0!important;border-radius:6px!important}
+  .blatt::before,.blatt::after{display:none}
+  .blatt canvas{width:100%;height:auto}
+  .spieler{grid-column:2;grid-row:2}
+  #werkzeuge{grid-column:2;grid-row:3}
+  .chat{grid-column:2;grid-row:3/5;max-height:calc(100svh - 120px)}
+  .msgs{height:auto;flex:1;min-height:60px}
+  /* Zeichner quer: Spielerleiste weg, Werkzeuge als Raster, Farben immer offen */
+  .kc.male .spieler{display:none}
+  /* Zeichner quer: schmale Werkzeugspalte rechts, dafür breitere Leinwand. Auswahlfenster klappen nach links über die Leinwand. */
+  .kc.male{--bh:calc(100svh - 14px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));--bw:min(calc(var(--bh) * 4 / 3),calc(100vw - 110px));grid-template-columns:var(--bw) 52px!important}
+  /* Kopfzeile schwebt als kleine Plakette über der Leinwand – die ganze Höhe gehört dem Bild. */
+  .kc.male .ktop{position:fixed;z-index:6;top:calc(10px + env(safe-area-inset-top,0px));left:calc(max(16px,env(safe-area-inset-left,0px)) + 6px);width:calc(var(--bw) - 12px);pointer-events:none;gap:6px}
+  .kc.male .ktop>*{pointer-events:auto}
+  .kc.male .ktop .wortbox{flex:0 1 auto;margin:0 auto;padding:3px 12px;border-radius:12px;background:rgba(14,26,43,.78);font-size:17px}
+  .kc.male .ktop .ibtn{background:rgba(14,26,43,.78)}
+  .kc.male .blatt{grid-row:1/5}
+  .kc.male #werkzeuge{grid-row:1/5!important}
+  .kc.male #werkzeuge{grid-row:2/5;grid-column:2}
+  .kc.male .tools{margin:0!important;border-radius:14px!important;border:2px solid var(--line)!important;padding:4px!important;height:var(--bh);overflow:visible}
+  .kc.male .tools .trow{flex-direction:column;flex-wrap:nowrap;overflow:visible;gap:4px;height:100%;justify-content:space-between}
+  .kc.male .tools .tool{width:40px;min-width:40px;height:34px;font-size:16px}
+  .kc.male .pop{left:auto;right:calc(100% + 8px);bottom:auto;top:0;width:230px}
+  .kc.male .schnell{display:none!important}
+  .kc.male.chatoffen .chat{left:auto;width:min(380px,48vw);max-height:100svh;border-radius:22px 0 0 22px}
 }
 
 /* ---------- Menü & Raum ---------- */
@@ -485,8 +541,10 @@ async function raten(text){
   await Z.ref.update({erraten:FV().arrayUnion(ich),[`punkte.${ich}`]:FV().increment(pts),[`punkte.${R.zeichner}`]:FV().increment(PUNKTE.zeichner),[`zugPunkte.${ich}`]:FV().increment(pts),[`zugPunkte.${R.zeichner}`]:FV().increment(PUNKTE.zeichner),updatedAt:Date.now()});
   sendeChat({typ:'richtig',t:''});confetti(50);ton('richtig');return;
  }
- /* Wer schon erraten hat (oder zeichnet), schreibt „geheim“ – das sehen nur die, die es auch wissen. */
- sendeChat({typ:'tipp',t:text,geheim:R.status==='laeuft'&&R.phase==='malen'&&(zeichner||schon)});
+ /* Zeichner darf mit allen schreiben – aber nicht das gesuchte Wort (auch nicht versteckt in einem Satz). */
+ if(zeichner&&R.phase==='malen'&&Z.wort&&WA.norm(text).includes(WA.norm(Z.wort))){toast('Das würde das Wort verraten 😉');return}
+ /* Wer schon erraten hat, schreibt „geheim“ – das sehen nur der Zeichner und die anderen, die es wissen. */
+ sendeChat({typ:'tipp',t:text,geheim:R.status==='laeuft'&&R.phase==='malen'&&!zeichner&&schon});
 }
 function sendeChat(m){const R=Z.R;if(!Z.ref||!R)return;Z.ref.collection('chat').add({by:Z.uid,ts:Date.now(),zug:R.zug||0,...m}).catch(e=>{console.warn(e);toast('Nachricht kam nicht an.')})}
 function sendeEmoji(e){floatEmoji(e);if(Z.uebung)return;sendeChat({typ:'emo',t:e})}
@@ -499,6 +557,8 @@ function neueNachricht(m,still){
  if(m.typ==='richtig'&&m.by!==Z.uid)ton('fremdRichtig');
  if(m.typ==='knapp'&&m.an===Z.uid){toast(`„${m.t}“ ist knapp daneben! 🔥`);ton('knapp')}
  if(R.zeichner===Z.uid)zeigeBlase(m);
+ /* Zähler am 💬-Knopf, solange das Chat-Fenster (Handy, Zeichner) zu ist. */
+ const kc=document.querySelector('.kc');if(kc&&kc.classList.contains('male')&&!kc.classList.contains('chatoffen')&&m.by!==Z.uid&&sichtbar(m)){Z.chatNeu=(Z.chatNeu||0)+1;const n=$('#chatN');if(n){n.hidden=false;n.textContent=Z.chatNeu>9?'9+':Z.chatNeu}}
 }
 const sichtbar=m=>{const R=Z.R;if(!R)return true;if(m.typ==='knapp')return m.an===Z.uid;if(m.geheim)return R.zeichner===Z.uid||(R.erraten||[]).includes(Z.uid)||m.by===Z.uid;return true};
 function nachrichtHTML(m){
@@ -509,7 +569,7 @@ function nachrichtHTML(m){
  return `<div class="m${ich?' ich':''}${m.geheim?' geheim':''}"><b>${esc(inf.name)}${m.geheim?' 🤫':''}</b>${esc(m.t)}</div>`;
 }
 function zeichneChat(){const box=$('#msgs');if(!box)return;const unten=box.scrollHeight-box.scrollTop-box.clientHeight<60;
- box.innerHTML=Z.chat.filter(sichtbar).slice(-120).map(nachrichtHTML).join('')||'<div class="m sys">Noch keine Tipps. Schreib, was du erkennst!</div>';if(unten)box.scrollTop=box.scrollHeight}
+ box.innerHTML=Z.chat.filter(sichtbar).slice(-120).map(nachrichtHTML).join('')||`<div class="m sys">${Z.R&&Z.R.status==='lobby'?'Noch still hier. Sag hallo! 👋':'Noch keine Tipps. Schreib, was du erkennst!'}</div>`;if(unten)box.scrollTop=box.scrollHeight}
 /* Zeichner sieht Tipps als Sprechblasen unter der Leinwand. */
 function zeigeBlase(m){const f=$('#feed');if(!f||!sichtbar(m)||m.by===Z.uid&&m.typ!=='emo')return;const inf=(Z.R.info[m.by])||{};
  const b=document.createElement('div');b.className='tbub'+(m.typ==='richtig'?' ok':m.typ==='emo'?' e':m.typ==='knapp'?' knapp':'');
@@ -528,7 +588,12 @@ function render(){
  const n=Z.view.name;document.body.classList.toggle('full',n==='spiel'||n==='uebung');renderTop();
  if(n==='spiel'){$('#view').innerHTML=spielGeruest();zeichneSpiel(true);return}
  if(n==='uebung'){$('#view').innerHTML=uebungGeruest();leinwandBauen();werkzeugeZeigen();return}
- $('#view').innerHTML=(VIEWS[n]||VIEWS.menu)(Z.view);
+ /* Getippten Text und Fokus behalten, wenn die Ansicht neu gezeichnet wird (z. B. jemand tritt bei). */
+ const vw=$('#view');const keep={};vw.querySelectorAll('input[id]').forEach(i=>{if(!i.readOnly)keep[i.id]=i.value});const fokus=document.activeElement&&document.activeElement.id;const st=vw.scrollTop;
+ vw.innerHTML=(VIEWS[n]||VIEWS.menu)(Z.view);
+ for(const id in keep){const el=document.getElementById(id);if(el&&!el.value)el.value=keep[id]}
+ if(fokus){const el=document.getElementById(fokus);if(el&&el.tagName==='INPUT'){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
+ if(n==='raum'){vw.scrollTop=st;zeichneChat()}
 }
 function renderTop(){
  $('#top').innerHTML=`<div class="top-l"><a class="xbtn" href="../" aria-label="Zurück zu allen Spielen">‹</a><div class="logo">KRITZEL<span>CLASH</span></div></div>
@@ -569,6 +634,9 @@ raum(){
  const slots=[...R.players.map(p=>`<div class="pslot">${p===R.host?'<span class="kr">👑</span>':''}${avHTML(R.info[p])}<span class="nm">${esc((R.info[p]||{}).name)}</span></div>`),...Array(Math.max(0,4-R.players.length)).fill('<div class="pslot leer"><span class="av">?</span><span class="nm">frei</span></div>')];
  return `<div class="raum"><div class="ktop"><button class="ibtn" data-a="verlassenFrage" aria-label="Verlassen">‹</button><div class="qlabel" style="font-size:20px">Kritzel-Raum</div></div>
  <h2 class="sec">Mitspieler <small>${R.players.length} / ${MAX_SPIELER}</small></h2><div class="pgrid">${slots.join('')}</div>
+ <h2 class="sec">Chat <small>schon mal Sprüche klopfen</small></h2>
+ <div class="chat"><div class="msgs" id="msgs" style="height:clamp(110px,22vh,220px)"></div><form class="crow" id="rateForm"><input id="rateIn" class="inp" maxlength="80" autocomplete="off" placeholder="Schreib den anderen …" aria-label="Nachricht"><button class="sendb" aria-label="Senden">➤</button></form>
+  <div class="emorow">${EMOJIS.map(e=>`<button class="emo" data-a="emo" data-v="${e}">${e}</button>`).join('')}</div></div>
  <h2 class="sec">Freunde einladen</h2>
  <div class="list">${freunde.length?freunde.slice(0,12).map(([id,p])=>{const eing=(R.invited||[]).includes(id);return `<div class="row"><span class="avwrap"><span class="av" style="display:block;width:42px;height:42px;border-radius:50%;overflow:hidden">${avatarSVG(p.avatar)}</span>${Z.onlineIds.has(id)?'<i class="ondot"></i>':''}</span><div class="mid"><div class="t1">${esc(p.name)}</div><div class="t2">${Z.onlineIds.has(id)?'online':'nicht online'}</div></div><button class="btn small${eing?' ghost':''}" data-a="einladen" data-v="${esc(id)}" ${eing?'disabled':''}>${eing?'Eingeladen':'Einladen'}</button></div>`}).join(''):'<div class="empty">Alle Freunde sind schon drin – oder schick den Link.</div>'}</div>
  <label class="lbl" for="invUrl">Oder Link schicken</label><input id="invUrl" class="inp" readonly value="${esc(url)}" style="font-size:13px">
@@ -583,13 +651,14 @@ raum(){
 /* Spielansicht: Gerüst einmal bauen (Leinwand bleibt erhalten), dann Teile aktualisieren. */
 function spielGeruest(){
  return `<div class="kc"><div class="main" style="display:grid;gap:10px;min-width:0">
-  <div class="ktop"><button class="ibtn" data-a="verlassenFrage" aria-label="Menü">‹</button><div class="wortbox" id="wort"></div><div class="zeit" id="zeit"><svg viewBox="0 0 46 46"><circle class="bg" cx="23" cy="23" r="19"/><circle class="fg" cx="23" cy="23" r="19" stroke-dasharray="119.4" stroke-dashoffset="0"/></svg><b id="zeitT"></b></div></div>
+  <div class="ktop"><button class="ibtn" data-a="verlassenFrage" aria-label="Menü">‹</button><div class="wortbox" id="wort"></div><button class="ibtn" id="chatBtn" data-a="chatAuf" aria-label="Chat öffnen">💬<i class="cbadge" id="chatN" hidden></i></button><div class="zeit" id="zeit"><svg viewBox="0 0 46 46"><circle class="bg" cx="23" cy="23" r="19"/><circle class="fg" cx="23" cy="23" r="19" stroke-dasharray="119.4" stroke-dashoffset="0"/></svg><b id="zeitT"></b></div></div>
   <div class="blatt" id="blatt"><canvas id="cv" width="1000" height="750" aria-label="Zeichenblatt"></canvas><div class="feed" id="feed" hidden></div><div id="ovl"></div></div>
   <div id="werkzeuge"></div>
+  <form class="crow schnell" id="schnellForm"><input id="schnellIn" class="inp" maxlength="80" autocomplete="off" placeholder="Schreib allen was (ohne das Wort) …" aria-label="Nachricht an alle"><button class="sendb" aria-label="Senden">➤</button></form>
  </div>
  <div class="side" style="display:grid;gap:10px;min-width:0">
   <div class="spieler" id="spieler"></div>
-  <div class="chat" id="chatbox"><div class="msgs" id="msgs"></div><form class="crow" id="rateForm"><input id="rateIn" class="inp" maxlength="80" autocomplete="off" placeholder="Dein Tipp …" aria-label="Dein Tipp"><button class="sendb" aria-label="Senden">➤</button></form>
+  <div class="chat" id="chatbox"><div class="chatkopf"><b>💬 Chat</b><button class="ibtn" data-a="chatZu" aria-label="Chat schließen">✕</button></div><div class="msgs" id="msgs"></div><form class="crow" id="rateForm"><input id="rateIn" class="inp" maxlength="80" autocomplete="off" placeholder="Dein Tipp …" aria-label="Dein Tipp"><button class="sendb" aria-label="Senden">➤</button></form>
    <div class="emorow">${EMOJIS.map(e=>`<button class="emo" data-a="emo" data-v="${e}">${e}</button>`).join('')}</div></div>
  </div></div>`;
 }
@@ -601,18 +670,25 @@ function uebungGeruest(){
 /* Werkzeugleiste: eine Zeile mit Farbknopf (klappt die Farben auf), Stift/Radierer/Füllen,
    Pinselgröße (Schieberegler mit Vorschau), Rückgängig, Löschen, Vollbild.
    Am großen Bildschirm sind die Farben immer offen. */
+/* Pinselgrößen zur Auswahl (Bildpunkte auf dem 1000er-Blatt). */
+const GROESSEN_WAHL=[3,6,10,16,26,40,60];
 function werkzeugeZeigen(){
  const w=$('#werkzeuge');if(!w)return;
  if(!ichZeichne()){w.innerHTML='';return}
- const vf=Z.werkzeug==='radierer'?'#FFFFFF':Z.farbe;
+ const vf=Z.werkzeug==='radierer'?'#FFFFFF':Z.farbe;const p=g=>Math.max(4,Math.min(26,Math.round(g*.45)));
  w.innerHTML=`<div class="tools">
-  <div class="trow"><button class="tool farbknopf" data-a="palette" aria-label="Farbe wählen" title="Farbe"><i style="background:${Z.farbe}"></i></button>
-  ${[['stift','✏️','Stift'],['radierer','🧽','Radierer'],['fuellen','🪣','Füllen']].map(([k,i,n])=>`<button class="tool${Z.werkzeug===k?' on':''}" data-a="werkzeug" data-v="${k}" aria-label="${n}" title="${n}">${i}</button>`).join('')}
-  <label class="dicke" title="Pinselgröße"><span class="dv"><i id="dickeV" style="width:${dPunkt()}px;height:${dPunkt()}px;background:${vf}"></i></span><input id="dicke" type="range" min="${DICKE_MIN}" max="${DICKE_MAX}" value="${Z.groesse}" aria-label="Pinselgröße"></label>
-  <button class="tool" data-a="undo" aria-label="Rückgängig" title="Rückgängig">↩️</button><button class="tool" data-a="leeren" aria-label="Alles löschen" title="Alles löschen">🗑️</button>
-  ${document.fullscreenEnabled?`<button class="tool" data-a="vollbild" aria-label="Vollbild" title="Vollbild">⛶</button>`:''}</div>
-  <div class="farben${Z.palette?' offen':''}">${FARBEN.map(f=>`<button class="farbe${Z.farbe===f&&Z.werkzeug!=='radierer'?' on':''}" style="background:${f}" data-a="farbe" data-v="${f}" aria-label="Farbe ${f}"></button>`).join('')}</div></div>`;
+  <div class="trow">
+   <button class="tool knopf${Z.pop==='farbe'?' on':''}" data-a="pop" data-v="farbe" aria-label="Farbe wählen" title="Farbe"><i class="fk" style="background:${Z.farbe}"></i></button>
+   <button class="tool knopf${Z.pop==='groesse'?' on':''}" data-a="pop" data-v="groesse" aria-label="Pinselgröße wählen" title="Größe"><i class="gk" style="width:${p(Z.groesse)}px;height:${p(Z.groesse)}px;background:${vf}"></i></button>
+   ${[['stift','✏️','Stift'],['radierer','🧽','Radierer'],['fuellen','🪣','Füllen']].map(([k,i,n])=>`<button class="tool${Z.werkzeug===k?' on':''}" data-a="werkzeug" data-v="${k}" aria-label="${n}" title="${n}">${i}</button>`).join('')}
+   <button class="tool" data-a="undo" aria-label="Rückgängig" title="Rückgängig">↩️</button><button class="tool" data-a="leeren" aria-label="Alles löschen" title="Alles löschen">🗑️</button>
+   <button class="tool" data-a="quer" aria-label="Quer und Vollbild" title="Quer + Vollbild">⟲</button></div>
+  ${Z.pop==='farbe'?`<div class="pop farbpop">${FARBEN.map(f=>`<button class="farbe${Z.farbe===f&&Z.werkzeug!=='radierer'?' on':''}" style="background:${f}" data-a="farbe" data-v="${f}" aria-label="Farbe ${f}"></button>`).join('')}</div>`:''}
+  ${Z.pop==='groesse'?`<div class="pop grpop">${GROESSEN_WAHL.map(g=>`<button class="gr${Z.groesse===g?' on':''}" data-a="groesse" data-v="${g}" aria-label="Größe ${g}"><i style="width:${p(g)}px;height:${p(g)}px;background:${vf}"></i></button>`).join('')}</div>`:''}
+ </div>`;
 }
+/* Auswahlfenster schließen, wenn man daneben tippt (auch beim Malen auf der Leinwand). */
+document.addEventListener('pointerdown',e=>{if(Z.pop&&!e.target.closest('.tools')){Z.pop=null;werkzeugeZeigen()}},true);
 /* Vorschau-Punkt: echte Pinselgröße im Verhältnis zur angezeigten Leinwand (mind. 3, max. 30 px). */
 function dPunkt(){const b=CV?CV.getBoundingClientRect().width/BW:.4;return Math.max(3,Math.min(30,Math.round(Z.groesse*(Z.werkzeug==='radierer'?1.6:1)*b)))}
 document.addEventListener('input',e=>{if(e.target.id!=='dicke')return;Z.groesse=+e.target.value;LS.set(KEY('dicke'),Z.groesse);const v=$('#dickeV');if(v){const p=dPunkt();v.style.width=v.style.height=p+'px'}});
@@ -621,7 +697,7 @@ function zeichneSpiel(voll){
  if(voll&&(!CV||CV!==$('#cv')))leinwandBauen();
  const ichZ=R.zeichner===Z.uid;const ichOk=(R.erraten||[]).includes(Z.uid);
  $('#blatt').classList.toggle('zuschauer',!ichZeichne());
- const kc=document.querySelector('.kc');if(kc)kc.classList.toggle('male',ichZ&&R.phase==='malen');   // Handy: Zeichner ohne Chat-Fenster
+ const kc=document.querySelector('.kc');if(kc){const male=ichZ&&R.phase==='malen';kc.classList.toggle('male',male);if(!male){kc.classList.remove('chatoffen');Z.chatNeu=0;const n=$('#chatN');if(n)n.hidden=true}}   // Handy: Zeichner mit Chat über 💬
  /* Wort oben */
  const w=$('#wort');
  if(R.phase==='malen'&&ichZ){w.className='wortbox ich';w.innerHTML=`${esc((Z.wort||'?').toUpperCase())}<small>malen!</small>`}
@@ -642,7 +718,7 @@ function zeichneSpiel(voll){
  if(voll)werkzeugeZeigen();
  /* Feed (nur Zeichner) und Chat-Eingabe */
  const feed=$('#feed');feed.hidden=!(ichZ&&R.phase==='malen');
- const inp=$('#rateIn');if(inp){inp.placeholder=ichZ&&R.phase==='malen'?'Du malst – schreib nur, was alle sehen dürfen 🤫':ichOk?'Erraten! Jetzt nur noch mit den anderen Wissenden 🤫':'Dein Tipp …';inp.classList.toggle('okay',ichOk)}
+ const inp=$('#rateIn');if(inp){inp.placeholder=ichZ&&R.phase==='malen'?'Schreib allen was (ohne das Wort) …':ichOk?'Erraten! Jetzt nur noch mit den anderen Wissenden 🤫':'Dein Tipp …';inp.classList.toggle('okay',ichOk)}
  /* Spieler */
  const sp=[...R.players].sort((a,b)=>((R.punkte||{})[b]||0)-((R.punkte||{})[a]||0));
  $('#spieler').innerHTML=sp.map(p=>{const inf=R.info[p]||{};const ok=(R.erraten||[]).includes(p);const weg=(R.weg||[]).includes(p);
@@ -683,13 +759,25 @@ const A={
  einst(ds){const R=Z.R;if(!R||R.host!==Z.uid)return;Z.ref.update({[`einst.${ds.k}`]:+ds.v,updatedAt:Date.now()})},
  starten(){starten()},
  wort(ds){wortWaehlen(ds.v)},
- farbe(ds){Z.farbe=ds.v;Z.palette=false;if(Z.werkzeug==='radierer')Z.werkzeug='stift';werkzeugeZeigen()},
- palette(){Z.palette=!Z.palette;werkzeugeZeigen()},
- werkzeug(ds){Z.werkzeug=ds.v;werkzeugeZeigen()},
- vollbild(){try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>toast('Vollbild geht auf diesem Gerät nicht.'))}catch(e){}},
+ farbe(ds){Z.farbe=ds.v;Z.pop=null;if(Z.werkzeug==='radierer')Z.werkzeug='stift';werkzeugeZeigen()},
+ pop(ds){Z.pop=Z.pop===ds.v?null:ds.v;werkzeugeZeigen()},
+ groesse(ds){Z.groesse=+ds.v;LS.set(KEY('dicke'),Z.groesse);Z.pop=null;werkzeugeZeigen()},
+ werkzeug(ds){Z.werkzeug=ds.v;Z.pop=null;werkzeugeZeigen()},
+ /* Quer + Vollbild: Android geht ins Vollbild und dreht auf quer. iPhone erlaubt das Webseiten
+    nicht – dort kommt der Hinweis, das Handy zu drehen (das Querformat-Layout greift automatisch). */
+ async quer(){
+  try{
+   if(document.fullscreenElement){await document.exitFullscreen();try{screen.orientation.unlock()}catch(e){}return}
+   if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen({navigationUI:'hide'})}
+   if(screen.orientation&&screen.orientation.lock){await screen.orientation.lock('landscape')}
+   else if(innerHeight>innerWidth)toast('Dreh dein Handy quer – dann wird die Leinwand größer 📱↻');
+  }catch(e){if(innerHeight>innerWidth)toast('Dreh dein Handy quer – dann wird die Leinwand größer 📱↻')}
+ },
  undo(){rueckgaengig()},
  leeren(){allesLoeschen()},
  emo(ds){sendeEmoji(ds.v)},
+ chatAuf(){const kc=document.querySelector('.kc');if(!kc)return;kc.classList.add('chatoffen');Z.chatNeu=0;const n=$('#chatN');if(n)n.hidden=true;zeichneChat();const b=$('#msgs');if(b)b.scrollTop=b.scrollHeight;setTimeout(()=>{const i=$('#rateIn');i&&i.focus()},200)},
+ chatZu(){const kc=document.querySelector('.kc');if(kc)kc.classList.remove('chatoffen')},
  togTon(){LS.set(KEY('ton'),!LS.get(KEY('ton'),true));render()},
  verlassenFrage(){const R=Z.R;openOverlay(`<h3>Raum verlassen?</h3><p>${R&&R.status==='laeuft'?'Die anderen spielen ohne dich weiter. Für diese Partie bekommst du nichts.':'Du kannst jederzeit über den Link zurück, solange der Raum offen ist.'}</p><div class="acts"><button class="btn coral block" data-a="verlassen">Verlassen</button><button class="btn ghost block" data-a="closeOvl">Bleiben</button></div>`)},
  verlassen(){raumVerlassen()},
@@ -698,7 +786,7 @@ const A={
  ovlBg(ds,el,e){if(e.target===el)closeOverlay()}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;const f=A[el.dataset.a];if(f)f(el.dataset,el,e)});
-document.addEventListener('submit',e=>{if(e.target.id!=='rateForm')return;e.preventDefault();const i=$('#rateIn');raten(i.value);i.value='';i.focus()});
+document.addEventListener('submit',e=>{const id=e.target.id;if(id!=='rateForm'&&id!=='schnellForm')return;e.preventDefault();const i=$(id==='rateForm'?'#rateIn':'#schnellIn');raten(i.value);i.value='';i.focus()});
 document.addEventListener('pointerdown',e=>{if(e.target.id==='cv')stiftAn(e)});
 document.addEventListener('pointermove',e=>{if(Z.strich)stiftBewegt(e)},{passive:false});
 ['pointerup','pointercancel','pointerleave'].forEach(t=>document.addEventListener(t,e=>{if(Z.strich&&(t!=='pointerleave'||e.target.id==='cv'))stiftAus()}));
