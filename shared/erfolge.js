@@ -27,7 +27,9 @@ const HUB_ERFOLGE=[
  ['quiz','🧠','Quizkopf','1.000 Punkte in Brainclash',1000,k=>(k.p&&k.p.points)||0],
  ['pasch','🎲','Fünferpasch!','Einen Fünferpasch eingetragen',1,k=>k.stand('wuerfelclash').fuenfer||0],
  ['rekord','📜','Würfelkönig','250 Punkte in einem Würfelclash-Spiel',250,k=>k.stand('wuerfelclash').rekord||0],
- ['live','🤝','Herausforderer','Ein Live-Würfelduell gewonnen',1,k=>k.stand('wuerfelclash').liveSiege||0]
+ ['live','🤝','Herausforderer','Ein Live-Würfelduell gewonnen',1,k=>k.stand('wuerfelclash').liveSiege||0],
+ ['blick','👀','Scharfer Blick','25 Begriffe in Kritzelclash erraten',25,k=>k.stand('kritzelclash').erraten||0],
+ ['kuenstler','🎨','Künstler','20 Bilder in Kritzelclash gemalt',20,k=>k.stand('kritzelclash').gemalt||0]
 ];
 /* Kontext für einen Spieler bauen und alle Erfolge auswerten. */
 function erfolgeVon(p,uid){

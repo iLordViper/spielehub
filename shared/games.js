@@ -74,6 +74,22 @@ const GAMES=[
   muenzen:(p,s)=>s.muenzen||0,
   siege:(p,s)=>s.siege||0,
   werte:(p,s)=>[[fmt(s.punkte),'Punkte'],[s.siege||0,'Siege'],[fmt(s.rekord),'Rekord'],[s.spiele||0,'Spiele'],[s.fuenfer||0,'Fünferpasch'],[s.niederlagen||0,'Niederlagen']]
+ },
+ {
+  id:'kritzelclash',
+  name:'Kritzelclash',
+  emoji:'🎨',
+  pfad:'kritzelclash/',
+  status:'live',
+  kurz:'Einer malt, alle raten. 2–8 Freunde, live im Chat, mit Hinweisen und „knapp daneben“.',
+  tags:['🎨 Malen','💬 Raten','👥 2–8','⚡ Live'],
+  farbe:['#FF7AC0','#9B3BD1','#5A1A7A'],
+  spielstand:true,
+  live:true,
+  punkte:(p,s)=>s.punkte||0,
+  muenzen:(p,s)=>s.muenzen||0,
+  siege:(p,s)=>s.siege||0,
+  werte:(p,s)=>[[fmt(s.punkte),'Punkte'],[s.siege||0,'Siege'],[s.spiele||0,'Partien'],[s.erraten||0,'Erraten'],[s.gemalt||0,'Gemalt'],[fmt(s.bestePunkte),'Bestes Spiel']]
  }
  /* Nächstes Spiel hier anhängen, z. B.:
  ,{
