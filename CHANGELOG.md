@@ -1,6 +1,32 @@
 # Änderungen
 
+## 1.1.0 – 22.11.2026 – Würfelclash, Münzen, Erfolge
+
+**Neues Spiel: Würfelclash** (`wuerfelclash/`, Doku: `docs/wuerfelclash.md`)
+- Original-Kniffel-Regeln, leuchtende 3D-Würfel mit Hüpf-Animation, Funken und Kombi-Einblendungen („GROSSE STRASSE!“).
+- Echte Würfelgeräusche (Kenney „Casino Audio“, CC0), Kuli-Kratzen beim Eintragen.
+- Spielzettel wie der echte Block: Papier, eine Spalte pro Spieler, Einträge in Handschrift.
+- Tipps vom Berater: erkennt Kombinationen, markiert Würfel zum Halten und das beste Feld.
+- Modi: Live-Duell gegen Freunde (Einladung über Liste oder Link), Würfelbot, Am Tisch (2–4), Solo.
+- Chat mit Sprechblasen unter dem Charakterbild (3 Sekunden je Nachricht), Bot antwortet mit Sprüchen.
+- Laufende Partien werden gespeichert (Live in der Datenbank, lokal nach jedem Zug).
+
+**Hub**
+- Münzen 🪙 als gemeinsame Währung: nur für Duelle gegen Freunde, Sieg 5, sonst 1 – in Würfelclash und Brainclash.
+- Hub-Erfolge im Profil (16 Stück, aus allen Spielen berechnet, mit Fortschritt).
+- Spielerkarte zeigt Punkte, Münzen, Siege und gespielte Spiele.
+- Herausforderungen aus Spielen erscheinen auf der Startseite und als Meldung mit „Annehmen“.
+- `tools/handy-vorschau.html`: Seiten in Handygröße prüfen.
+
+**Brainclash**
+- Münzen für Duelle und Live-Duelle gegen Freunde (nicht gegen den Quizbot), Anzeige oben.
+
+**Datenbank** (`firestore.rules`, in Firebase veröffentlicht)
+- Neu: `spielstand/{spiel}/spieler/{uid}`, `partien/{spiel}/liste/{id}` und deren `chat`.
+
 ## 1.0.0 – 22.11.2026 – Der Hub entsteht
+
+Veröffentlicht am 22.11.2026 im neuen Repo `iLordViper/spielehub`, live unter https://ilordviper.github.io/spielehub/. Alle 14 Dateien auf GitHub sind mit dem lokalen Stand verglichen (identisch).
 
 **Neu**
 - Hub-Startseite „Clash Club“ mit den Reitern Spiele, Rangliste und Profil.

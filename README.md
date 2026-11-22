@@ -2,11 +2,16 @@
 
 Die Spielhalle für dich und deine Freunde im Browser. Ein Charakter (Name, Avatar, Banner) gilt für alle Spiele, die Punkte aller Spiele zählen zusammen.
 
-Erstes Spiel: **Brainclash** (Quiz-Duelle, Live-Duell, Party, Schätzfragen).
+Spiele:
+1. **Brainclash** – Quiz-Duelle, Live-Duell, Party, Schätzfragen
+2. **Würfelclash** – Würfeln nach Original-Kniffel-Regeln mit 3D-Würfeln, Live-Duell, Bot, Chat ([Doku](docs/wuerfelclash.md))
+
+Hauptprofil über alle Spiele: Level, Hub-Punkte, **Münzen 🪙** (Sieg 5, sonst 1 – nur Duelle gegen Freunde) und **Erfolge**.
 
 | | |
 |---|---|
-| Geplante Adresse | `https://ilordviper.github.io/spielehub/` |
+| Adresse (live seit 22.11.2026) | `https://ilordviper.github.io/spielehub/` |
+| GitHub-Repo | `https://github.com/iLordViper/spielehub` (öffentlich, Pages: `main` / root) |
 | Brainclash im Hub | `https://ilordviper.github.io/spielehub/brainclash/` |
 | Alte Brainclash-Adresse | `https://ilordviper.github.io/brainclash/` – läuft unverändert weiter |
 | Datenbank | Firebase-Projekt `brainclash-7f1b0` (dieselbe wie bisher) |
@@ -21,7 +26,10 @@ Erstes Spiel: **Brainclash** (Quiz-Duelle, Live-Duell, Party, Schätzfragen).
 | `shared/core.js` | Gemeinsame Hilfsfunktionen, Level-Formel, Avatar-Zeichner |
 | `shared/firebase.js` | Firebase-Zugangsdaten, anonyme Anmeldung, Online-Anzeige |
 | `shared/games.js` | **Liste aller Spiele** – hier kommt jedes neue Spiel rein |
+| `shared/erfolge.js` | Hub-Erfolge (aus allen Spielen berechnet) |
 | `brainclash/index.html` | Das Quiz (eine Datei, wie bisher) |
+| `wuerfelclash/` | Das Würfelspiel: `index.html`, `regeln.js` (+ Test), `sounds/` |
+| `tools/handy-vorschau.html` | Seite in Handygröße ansehen (`…/tools/handy-vorschau.html?seite=wuerfelclash/?demo`) |
 | `firestore.rules` | Sicherheitsregeln der Datenbank (Kopie dessen, was in Firebase eingestellt ist) |
 | `tools/lokal-testen.js` | Kleiner Webserver zum Testen auf dem PC |
 | `docs/` | Anleitungen (siehe unten) |

@@ -89,7 +89,7 @@
 /* ---------- 1. Einstellungen ---------- */
 const HUB_NAME='Clash Club';            // Name im Fenstertitel und in Meldungen
 const HUB_LOGO=['CLASH','CLUB'];        // Logo: erster Teil gold, zweiter Teil weiß
-const HUB_VERSION='1.0.0';              // bei jeder Änderung hochzählen (siehe CHANGELOG.md)
+const HUB_VERSION='1.1.0';              // bei jeder Änderung hochzählen (siehe CHANGELOG.md)
 /* Testmodus: index.html?demo öffnet den Hub OHNE Datenbank mit Beispielspielern.
    Nichts landet bei den Freunden. Gedacht zum Ausprobieren von Änderungen. */
 const DEMO=new URLSearchParams(location.search).has('demo');
@@ -107,7 +107,7 @@ const DEMO_PROFILES={
    übernimmt (sonst würde es in die echte Datenbank hochgeladen – ist am 22.11. passiert). */
 const PROFILE_KEY=DEMO?'hub_demo_profile':'ka_profile';
 const H={online:false,uid:null,fs:null,me:null,profiles:{},onlineIds:new Set(),
- view:{name:'loading'},tab:'spiele',boardGame:'gesamt'};
+ view:{name:'loading'},tab:'spiele',boardGame:'gesamt',invites:{}};
 
 /* Felder, die der Hub selbst verwaltet. Alles andere im Profil gehört den Spielen
    und wird vom Hub nie überschrieben (Speichern mit merge). */
@@ -141,7 +141,7 @@ function render(scrollTop){
 /* Neu zeichnen, wenn Daten kommen – aber nicht, während jemand tippt oder den Avatar baut. */
 function softRender(){if(!VIEWS_FULL.includes(H.view.name))render(false)}
 function renderTop(){
- $('#top').innerHTML=`<div class="logo">${esc(HUB_LOGO[0])}<span>${esc(HUB_LOGO[1])}</span></div><div class="top-r">${H.online?`<span class="chip"><i class="live"></i>${H.onlineIds.size+1} online</span>`:''}${H.me?`<span class="chip gold">⭐ ${fmt(myPoints())}</span>`:''}</div>`;
+ $('#top').innerHTML=`<div class="logo">${esc(HUB_LOGO[0])}<span>${esc(HUB_LOGO[1])}</span></div><div class="top-r">${H.online?`<span class="chip"><i class="live"></i>${H.onlineIds.size+1} online</span>`:''}${H.me?`<span class="chip" title="Münzen aus allen Spielen">🪙 ${fmt(totalMuenzen(H.me,H.uid))}</span><span class="chip gold">⭐ ${fmt(myPoints())}</span>`:''}</div>`;
 }
 
 /* Spielerkarte. own = eigenes Profil (zeigt „noch X Punkte bis …“). */
@@ -153,7 +153,7 @@ function bannerHTML(p,id,own){
  return `<div class="banner" style="background:${b.css}">
   <div class="av">${avatarSVG(p.avatar)}</div>
   <div class="who"><div class="bname">${esc(p.name||'Spieler')}</div><div class="btitle">${esc(hubTitleFor(L))}</div>
-   <div class="bstats"><span>⭐ ${fmt(pts)}</span><span>🎮 ${played} von ${GAMES.filter(g=>g.status==='live').length} Spielen</span></div>
+   <div class="bstats"><span>⭐ ${fmt(pts)}</span><span>🪙 ${fmt(totalMuenzen(p,id))}</span><span>🏆 ${totalSiege(p,id)} Siege</span><span>🎮 ${played}/${GAMES.filter(g=>g.status==='live').length}</span></div>
    <div class="xp"><i style="width:${pct}%"></i></div>
    <div class="xpl">${own?`Noch ${fmt(nxt-pts)} Punkte bis Level ${L+1}`:`Level ${L}`}</div></div>
   <div class="lvl"><b>${L}</b><small>LEVEL</small></div>
@@ -198,6 +198,11 @@ function gameStatsHTML(p,id){
  return GAMES.filter(g=>g.status==='live').map(g=>{const w=g.werte(p,standOf(g,id));
   return `<div class="gstat"><h2 class="sec">${g.emoji} ${esc(g.name)} <a class="btn small ghost" href="${esc(g.pfad)}">Spielen</a></h2><div class="stats">${w.map(([v,l])=>`<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('')}</div></div>`}).join('');
 }
+/* Hub-Erfolge (shared/erfolge.js). kurz = nur freigeschaltete zeigen (Fenster anderer Spieler). */
+function erfolgeHTML(p,id,kurz){
+ const list=erfolgeVon(p,id);const n=list.filter(a=>a.ok).length;const zeig=kurz?list.filter(a=>a.ok):list;
+ return `<h2 class="sec">Erfolge <small>${n} von ${list.length}</small></h2>${zeig.length?`<div class="achs">${zeig.map(a=>`<div class="ach${a.ok?' on':''}" title="${esc(a.desc)}"><span class="ae">${a.ic}</span><span class="an">${esc(a.name)}</span><span class="ad">${esc(a.desc)}</span>${a.ok?'':`<span class="ap"><i style="width:${Math.round(a.wert/a.ziel*100)}%"></i></span><span class="ad">${fmt(a.wert)} / ${fmt(a.ziel)}</span>`}</div>`).join('')}</div>`:'<div class="empty">Noch keine Erfolge.</div>'}`;
+}
 
 const VIEWS={
 loading(){return `<div class="loading"><div class="spinq">🎮</div><div class="hero-logo" style="font-size:40px">${esc(HUB_LOGO[0])}<span>${esc(HUB_LOGO[1])}</span></div><div class="marquee">${bulbs(9)}</div><p class="muted">Die Lichter gehen an …</p></div>`},
@@ -216,7 +221,10 @@ editor(v){return `<div class="qtop"><button class="xbtn" data-a="tab" data-v="pr
 
 spiele(){
  const live=GAMES.filter(g=>g.status==='live'),soon=GAMES.filter(g=>g.status!=='live');
- return `${noticeHTML()}<a class="bannerlink" href="#" data-a="tab" data-v="profil" aria-label="Zu deinem Profil">${bannerHTML(H.me,H.uid,true)}</a>
+ const inv=Object.values(H.invites).flat();
+ const invHTML=inv.map(x=>{const g=GAME[x.spiel];const h=(x.info||{})[x.host]||{};
+  return `<a class="row" style="border-color:var(--gold);text-decoration:none;color:inherit;margin-bottom:10px" href="${esc(g.pfad)}#tisch-${esc(x.id)}"><span class="av" style="display:block">${avatarSVG(h.avatar)}</span><span class="mid"><span class="t1" style="display:block">${esc(h.name||'Jemand')} fordert dich heraus!</span><span class="t2" style="display:block">${g.emoji} ${esc(g.name)} · Live-Duell</span></span><span class="btn small coral">Annehmen</span></a>`}).join('');
+ return `${noticeHTML()}${invHTML}<a class="bannerlink" href="#" data-a="tab" data-v="profil" aria-label="Zu deinem Profil">${bannerHTML(H.me,H.uid,true)}</a>
  <h2 class="sec">Spiele <small>${live.length} spielbar</small></h2>
  <div class="games">${live.map(gameCardHTML).join('')}${soon.map(gameCardHTML).join('')}
   ${soon.length?'':`<div class="game soon"><div class="g-art">➕</div><div class="g-body"><div class="g-row"><h3>Nächstes Spiel</h3><span class="pill">🛠️ In Arbeit</span></div><p>Hier kommt das nächste Spiel hin. Dein Charakter und deine Punkte kommen automatisch mit.</p></div></div>`}</div>
@@ -239,13 +247,14 @@ profil(){
  <div class="acts" style="display:grid;gap:10px;margin-top:16px"><button class="btn block" data-a="openEditor">✏️ Charakter bearbeiten</button></div>
  <h2 class="sec">Banner <small>neue ab höherem Level</small></h2>
  <div class="bpick">${BANNERS.map((b,i)=>`<button class="bp${(H.me.banner||0)===i?' on':''}" style="background:${b.css}" data-a="setBanner" data-v="${i}" ${L<b.lv?'disabled':''} aria-label="${esc(b.n)}">${L<b.lv?`<span class="lk">🔒 Lvl ${b.lv}</span>`:''}</button>`).join('')}</div>
+ ${erfolgeHTML(H.me,H.uid)}
  ${gameStatsHTML(H.me,H.uid)}
  <p class="lastline">Dein Profil gilt für alle Spiele im ${esc(HUB_NAME)}. Es ist an diesen Browser gebunden. Wer Browserdaten löscht oder das Gerät wechselt, startet mit einem neuen Profil.</p>`}
 };
 
 function showProfile(id){
  const p=profileOf(id);if(!p)return;
- openOverlay(`${bannerHTML(p,id,false)}${gameStatsHTML(p,id)}<div class="acts"><button class="btn ghost block" data-a="closeOvl">Schließen</button></div>`);
+ openOverlay(`${bannerHTML(p,id,false)}${erfolgeHTML(p,id,true)}${gameStatsHTML(p,id)}<div class="acts"><button class="btn ghost block" data-a="closeOvl">Schließen</button></div>`);
 }
 
 /* ---------- 4. Aktionen ----------
@@ -297,6 +306,15 @@ async function boot(){
   /* Eigene Spielstände der Spiele, die das nutzen (spielstand:true in games.js). */
   GAMES.filter(g=>g.spielstand).forEach(g=>{
    H.fs.collection(`spielstand/${g.id}/spieler`).onSnapshot(s=>{const m={};s.docs.forEach(d=>{m[d.id]=d.data()});STAND[g.id]=m;renderTop();softRender()},()=>{});
+  });
+  /* Herausforderungen aus Spielen mit Live-Partien (live:true in games.js). */
+  GAMES.filter(g=>g.live).forEach(g=>{
+   H.fs.collection(`partien/${g.id}/liste`).where('invited','array-contains',H.uid).onSnapshot(s=>{
+    const list=s.docs.map(d=>({...d.data(),id:d.id,spiel:g.id})).filter(x=>x.status==='warten'&&x.host!==H.uid&&Date.now()-(x.createdAt||0)<3600e3);
+    const neu=list.filter(x=>!(H.invites[g.id]||[]).some(o=>o.id===x.id));
+    H.invites[g.id]=list;
+    neu.forEach(x=>{const h=(x.info||{})[x.host]||{};toast(`${h.name||'Jemand'} fordert dich zu ${g.name} heraus!`,{av:h.avatar,ms:9000,link:{href:`${g.pfad}#tisch-${x.id}`,label:'Annehmen'}})});
+    softRender()},()=>{});
   });
   HubFirebase.presence(H.fs,H.uid,ids=>{const a=[...ids].sort().join(),b=[...H.onlineIds].sort().join();H.onlineIds=ids;if(a!==b){renderTop();softRender()}});
  }else if(!DEMO){H.uid='local'}
