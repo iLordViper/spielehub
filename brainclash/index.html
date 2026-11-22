@@ -615,6 +615,7 @@ button,a,.ans,.emo{touch-action:manipulation;-webkit-user-select:none;user-selec
    SPIELE-HUB (seit 22.11.2026): Diese Datei liegt im Hub-Ordner
    brainclash/. Gegenüber der alten Einzelseite geändert ist nur:
    – Zurück-Knopf zum Hub in der Kopfleiste (HUB_URL, renderTop)
+   – Münzen für Duelle gegen Freunde (addMuenzen, Feld „muenzen“)
    Profil, Avatar und Punkte teilt sich Brainclash mit dem Hub über
    dasselbe Dokument profiles/{uid}. Firebase-Daten bei einem
    Projektwechsel auch in ../shared/firebase.js ändern.
@@ -2610,6 +2611,10 @@ function getProfile(id){if(id==='bot')return BOT;if(id===S.myId)return S.me||new
 function allProfiles(){const m=S.online?{...S.profiles}:{};if(S.me)m[S.myId]=S.me;return m}
 const SRC={solo:['🏅 Rangspiel','#9B6BFF'],duel:['⚔️ Duelle','#FF6B57'],topic:['🎯 Themen-Quiz','#3D8BFF'],math:['✖️ 1×1-Trainer','#22C98A'],tower:['🗼 Aufstieg','#FFC53D'],party:['🎉 Party','#FF7AC0'],ach:['🏅 Erfolge','#FFD27A']};
 const srcOf=m=>m==='mathStage'||m==='mathEndless'?'math':m;
+/* Spiele-Hub-Münzen (seit 22.11.2026): Sieg 5, sonst 1 – nur für Duelle gegen Freunde.
+   Gespeichert im Profil als „muenzen“; der Hub zählt sie mit den Münzen der anderen Spiele zusammen. */
+const MUENZEN={sieg:5,sonst:1};
+function addMuenzen(sieg){const n=sieg?MUENZEN.sieg:MUENZEN.sonst;S.me.muenzen=(S.me.muenzen||0)+n;setTimeout(()=>toast(`+${n} 🪙 ${sieg?'Siegesmünzen':'Münze'} für dein Duell`),1200)}
 function addPoints(mode,n){if(!n)return;S.me.points=(S.me.points||0)+n;const k=srcOf(mode);S.me.ptsBy={...(S.me.ptsBy||{})};S.me.ptsBy[k]=(S.me.ptsBy[k]||0)+n}
 const acc=p=>p&&p.answered?Math.round(100*p.correct/p.answered):0;
 const isOnline=id=>S.onlineIds.has(id);
@@ -2713,6 +2718,7 @@ function processDuels(){
    S.me.countedDuels=[...S.me.countedDuels,d.id].slice(-300);changed=true;
    const before=levelFor(S.me.points);
    if(st.winner===S.myId){S.me.wins++;addPoints('duel',100)}else if(st.winner==='draw'){S.me.draws++;addPoints('duel',40)}else{S.me.losses++;addPoints('duel',20)}
+   if(!d.bot)addMuenzen(st.winner===S.myId);   // Spiele-Hub: Münzen nur für Duelle gegen Freunde
    recordResult(oppOf(d),st.winner===S.myId?'w':st.winner==='draw'?'d':'l',false);
    if(levelFor(S.me.points)>before)setTimeout(()=>levelUpFX(levelFor(S.me.points)),2200);
   }
@@ -2770,7 +2776,7 @@ function softRender(){
  render(false);
 }
 function renderTop(){
- $('#top').innerHTML=`<div class="top-l">${STANDALONE?`<a class="hubback" href="${HUB_URL}" aria-label="Zurück zu allen Spielen">‹</a>`:''}<div class="logo">BRAIN<span>CLASH</span></div></div><div class="top-r">${S.online?`<span class="chip"><i class="live"></i>${S.onlineIds.size+1} online</span>`:''}${S.me?`<span class="chip gold">⭐ ${fmt(S.me.points)}</span>`:''}</div>`;
+ $('#top').innerHTML=`<div class="top-l">${STANDALONE?`<a class="hubback" href="${HUB_URL}" aria-label="Zurück zu allen Spielen">‹</a>`:''}<div class="logo">BRAIN<span>CLASH</span></div></div><div class="top-r">${S.online?`<span class="chip"><i class="live"></i>${S.onlineIds.size+1} online</span>`:''}${S.me?`<span class="chip">🪙 ${fmt(S.me.muenzen||0)}</span><span class="chip gold">⭐ ${fmt(S.me.points)}</span>`:''}</div>`;
 }
 function renderTabs(){$$('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v===S.tab))}
 function updateBadges(){
@@ -3875,6 +3881,7 @@ function liveFinish(){
  const before=levelFor(S.me.points);
  addPoints('duel',L.pts);S.me.correct+=L.correct;S.me.answered+=L.answeredN;
  if(st.winner===me){S.me.wins++;addPoints('duel',100);confetti(140);beep('win')}else if(st.winner==='draw'){S.me.draws++;addPoints('duel',40)}else{S.me.losses++;addPoints('duel',20)}
+ addMuenzen(st.winner===me);   // Spiele-Hub: Live-Duell = immer gegen einen Freund
  const opp=liveOpp();recordResult(opp,st.winner===me?'w':st.winner==='draw'?'d':'l',true);
  if(st.winner===me&&st.reason==='end'){const myHp=(st.hp||{})[me]??0;if(myHp>=100)statsOf().flawless=(statsOf().flawless||0)+1;if(myHp<=20)statsOf().comeback=(statsOf().comeback||0)+1}
  saveProfile();const after=levelFor(S.me.points);if(after>before)setTimeout(()=>levelUpFX(after),1800);
