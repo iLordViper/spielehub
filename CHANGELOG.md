@@ -1,5 +1,25 @@
 # Änderungen
 
+## 1.2.0 – 22.11.2026 – Kritzelclash
+
+**Neues Spiel: Kritzelclash** (`kritzelclash/`, Doku: `docs/kritzelclash.md`)
+- Einer malt, alle raten – 2–8 Freunde live, Einladung über Liste, Link oder Hub.
+- Zeichner: große, am Handy randlose Leinwand, Farben, Stift, Radierer, Füllen, Pinselgröße als Schieberegler, Rückgängig, Löschen, Vollbild. Tipps der anderen als Sprechblasen auf der Leinwand, Emojis.
+- Rater: Bild live, Chat zum Raten, „knapp daneben“, aufgedeckte Buchstaben, Geheim-Chat für die, die es schon wissen.
+- 265 Begriffe in drei Stufen, Begriff nur als Fingerabdruck in der Datenbank.
+- 90 Sekunden zum Malen (wählbar 60/90/120), 2–4 Runden.
+- Punkte nach Tempo, Zeichner 60 je Treffer; Münzen: Sieger 5, alle anderen 1. Übungsblatt zum Ausprobieren.
+
+**Hub**
+- Kritzelclash in der Spieleliste, 2 neue Erfolge („Scharfer Blick“, „Künstler“).
+- Einladungen in offene Räume erscheinen auf der Startseite („Rein da“).
+
+**Datenbank** (in Firebase veröffentlicht, alte Regeln gesichert)
+- Räume mit bis zu 8 Spielern beitreten (`status: 'lobby'`), Zeichenstriche unter `…/zuege/{zug}/striche`.
+
+**Werkzeuge**
+- `tools/datensicherung.mjs` sichert jetzt auch Kritzelclash (ohne Zeichenstriche).
+
 ## 1.1.0 – 22.11.2026 – Würfelclash, Münzen, Erfolge
 
 **Neues Spiel: Würfelclash** (`wuerfelclash/`, Doku: `docs/wuerfelclash.md`)

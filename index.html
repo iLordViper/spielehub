@@ -89,7 +89,7 @@
 /* ---------- 1. Einstellungen ---------- */
 const HUB_NAME='Clash Club';            // Name im Fenstertitel und in Meldungen
 const HUB_LOGO=['CLASH','CLUB'];        // Logo: erster Teil gold, zweiter Teil weiß
-const HUB_VERSION='1.1.0';              // bei jeder Änderung hochzählen (siehe CHANGELOG.md)
+const HUB_VERSION='1.2.0';              // bei jeder Änderung hochzählen (siehe CHANGELOG.md)
 /* Testmodus: index.html?demo öffnet den Hub OHNE Datenbank mit Beispielspielern.
    Nichts landet bei den Freunden. Gedacht zum Ausprobieren von Änderungen. */
 const DEMO=new URLSearchParams(location.search).has('demo');
@@ -223,7 +223,8 @@ spiele(){
  const live=GAMES.filter(g=>g.status==='live'),soon=GAMES.filter(g=>g.status!=='live');
  const inv=Object.values(H.invites).flat();
  const invHTML=inv.map(x=>{const g=GAME[x.spiel];const h=(x.info||{})[x.host]||{};
-  return `<a class="row" style="border-color:var(--gold);text-decoration:none;color:inherit;margin-bottom:10px" href="${esc(g.pfad)}#tisch-${esc(x.id)}"><span class="av" style="display:block">${avatarSVG(h.avatar)}</span><span class="mid"><span class="t1" style="display:block">${esc(h.name||'Jemand')} fordert dich heraus!</span><span class="t2" style="display:block">${g.emoji} ${esc(g.name)} · Live-Duell</span></span><span class="btn small coral">Annehmen</span></a>`}).join('');
+  const raum=x.status==='lobby';
+  return `<a class="row" style="border-color:var(--gold);text-decoration:none;color:inherit;margin-bottom:10px" href="${esc(g.pfad)}#tisch-${esc(x.id)}"><span class="av" style="display:block">${avatarSVG(h.avatar)}</span><span class="mid"><span class="t1" style="display:block">${esc(h.name||'Jemand')} ${raum?'lädt dich ein!':'fordert dich heraus!'}</span><span class="t2" style="display:block">${g.emoji} ${esc(g.name)} · ${raum?`Raum mit ${(x.players||[]).length} Spielern`:'Live-Duell'}</span></span><span class="btn small coral">${raum?'Rein da':'Annehmen'}</span></a>`}).join('');
  return `${noticeHTML()}${invHTML}<a class="bannerlink" href="#" data-a="tab" data-v="profil" aria-label="Zu deinem Profil">${bannerHTML(H.me,H.uid,true)}</a>
  <h2 class="sec">Spiele <small>${live.length} spielbar</small></h2>
  <div class="games">${live.map(gameCardHTML).join('')}${soon.map(gameCardHTML).join('')}
@@ -310,7 +311,8 @@ async function boot(){
   /* Herausforderungen aus Spielen mit Live-Partien (live:true in games.js). */
   GAMES.filter(g=>g.live).forEach(g=>{
    H.fs.collection(`partien/${g.id}/liste`).where('invited','array-contains',H.uid).onSnapshot(s=>{
-    const list=s.docs.map(d=>({...d.data(),id:d.id,spiel:g.id})).filter(x=>x.status==='warten'&&x.host!==H.uid&&Date.now()-(x.createdAt||0)<3600e3);
+    /* 'warten' = Duell (Würfelclash), 'lobby' = offener Raum (Kritzelclash). */
+    const list=s.docs.map(d=>({...d.data(),id:d.id,spiel:g.id})).filter(x=>(x.status==='warten'||x.status==='lobby')&&x.host!==H.uid&&!(x.players||[]).includes(H.uid)&&Date.now()-(x.createdAt||0)<3600e3);
     const neu=list.filter(x=>!(H.invites[g.id]||[]).some(o=>o.id===x.id));
     H.invites[g.id]=list;
     neu.forEach(x=>{const h=(x.info||{})[x.host]||{};toast(`${h.name||'Jemand'} fordert dich zu ${g.name} heraus!`,{av:h.avatar,ms:9000,link:{href:`${g.pfad}#tisch-${x.id}`,label:'Annehmen'}})});
