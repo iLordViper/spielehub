@@ -1,0 +1,78 @@
+rules_version = '2';
+// Sicherheitsregeln für Brainclash (Cloud Firestore)
+// In der Firebase-Konsole unter Firestore → Regeln komplett einfügen und veröffentlichen.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // Spielerprofile: alle Spieler dürfen lesen, jeder schreibt nur sein eigenes
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow write: if isMe(uid);
+    }
+
+    // Wer ist online: jeder schreibt nur seinen eigenen Eintrag
+    match /presence/{uid} {
+      allow read: if signedIn();
+      allow write: if isMe(uid);
+    }
+
+    // Duelle: nur die beiden Spieler dürfen anlegen, ändern und löschen
+    match /duels/{duelId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid in request.resource.data.players;
+      allow update, delete: if signedIn() && request.auth.uid in resource.data.players;
+    }
+
+    // Chat innerhalb eines Duells
+    match /duelchat/{duelId}/msgs/{msgId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.by == request.auth.uid;
+      allow delete: if signedIn();
+    }
+
+    // Live-Duelle (Echtzeit)
+    match /live/{liveId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid in request.resource.data.players;
+      allow update: if signedIn() && (request.auth.uid in resource.data.players
+                    || (resource.data.status == 'waiting' && request.auth.uid in request.resource.data.players));
+      allow delete: if signedIn() && request.auth.uid in resource.data.players;
+      match /ans/{uid} {
+        allow read: if signedIn();
+        allow write: if isMe(uid);
+      }
+    }
+
+    // Party-Modus (bis zu 8 Spieler)
+    match /party/{partyId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.host == request.auth.uid;
+      allow update, delete: if signedIn() && request.auth.uid in resource.data.players;
+      match /ans/{uid} {
+        allow read: if signedIn();
+        allow write: if isMe(uid);
+      }
+    }
+
+    // ---- SPIELE-HUB: Spielstände weiterer Spiele ----
+    // Noch auskommentiert, weil es noch kein zweites Spiel gibt.
+    // Beim ersten neuen Spiel: die drei Zeilen unten einkommentieren und
+    // die Regeln in der Firebase-Konsole neu veröffentlichen
+    // (siehe docs/spiel-hinzufuegen.md, Schritt 5).
+    // match /spielstand/{spiel}/spieler/{uid} {
+    //   allow read: if signedIn();
+    //   allow write: if isMe(uid);
+    // }
+
+    // Lobby-Chat
+    match /lobby/{msgId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.by == request.auth.uid
+                    && request.resource.data.size() <= 4;
+      allow delete: if signedIn();
+    }
+  }
+}

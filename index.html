@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="de">
+<head>
+<!-- ==========================================================================
+     SPIELE-HUB · STARTSEITE (index.html)
+     --------------------------------------------------------------------------
+     Der Hub ist die gemeinsame Eingangshalle für alle Spiele:
+       • Spiele    – Kacheln aller Spiele aus shared/games.js
+       • Rangliste – Gesamtpunkte und Punkte je Spiel
+       • Profil    – ein Charakter (Name, Avatar, Banner) für ALLE Spiele
+
+     Dateien, die hier eingebunden werden:
+       shared/theme.css     Farben, Schriften, Knöpfe (gemeinsames Design)
+       shared/core.js       Hilfsfunktionen, Level, Avatar
+       shared/firebase.js   Anmeldung + Datenbank + Online-Anzeige
+       shared/games.js      Liste der Spiele  ← hier neue Spiele eintragen
+
+     Name des Hubs ändern: unten im Skript HUB_NAME und HUB_LOGO.
+     ========================================================================== -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clash Club</title>
+<meta name="description" content="Clash Club – die Spielhalle für dich und deine Freunde">
+<meta name="theme-color" content="#0E1A2B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Clash Club">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="shared/theme.css">
+<style>
+/* ---------- Nur im Hub: Spielkacheln ----------
+   Jede Kachel bekommt ihre Farben aus games.js (--g1, --g2 = Verlauf, --sh = Schatten). */
+.games{display:grid;gap:14px}
+.game{position:relative;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;border-radius:24px;padding:16px;color:#fff;text-decoration:none;overflow:hidden;isolation:isolate;
+  background:linear-gradient(150deg,var(--g1),var(--g2));box-shadow:0 7px 0 var(--sh);transition:transform .08s,box-shadow .08s;animation:cardIn .55s cubic-bezier(.2,1.4,.4,1) backwards}
+.game:nth-child(2){animation-delay:.07s}.game:nth-child(3){animation-delay:.14s}.game:nth-child(4){animation-delay:.21s}
+.game:active{transform:translateY(6px);box-shadow:0 1px 0 var(--sh)}
+.game::before{content:"";position:absolute;width:190px;height:190px;border-radius:50%;right:-70px;top:-90px;background:rgba(255,255,255,.12);z-index:-1}
+.game.dark{color:#2A1700}
+.g-art{width:78px;height:78px;border-radius:22px;display:grid;place-items:center;font-size:46px;background:rgba(0,0,0,.18);box-shadow:inset 0 -4px 0 rgba(0,0,0,.15)}
+.g-body{min-width:0;display:grid;gap:6px}
+.g-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.g-row h3{font-family:var(--font-display);font-weight:400;font-size:27px;line-height:1;margin:0;text-shadow:0 3px 0 rgba(0,0,0,.22);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game p{margin:0;font-size:13.5px;font-weight:800;line-height:1.35;opacity:.95}
+.g-tags{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:900;padding:5px 10px;border-radius:99px;background:rgba(0,0,0,.22);white-space:nowrap}
+.g-play{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px;padding:10px 14px;border-radius:16px;background:rgba(0,0,0,.2);font-family:var(--font-display);font-size:19px;letter-spacing:.4px}
+.g-play b{font-family:var(--font-body);font-size:13px;font-weight:900;opacity:.9}
+.game.soon{background:var(--surface);color:var(--muted);box-shadow:0 7px 0 var(--shadow);border:2px dashed var(--line)}
+.game.soon .g-art{background:var(--bg2);filter:grayscale(.4)}
+.game.soon h3{color:var(--ink);text-shadow:none}
+.game.soon::before{display:none}
+.bannerlink{display:block;text-decoration:none;color:inherit}
+.gstat h2.sec{margin-top:20px}
+.gstat .sub{font-family:var(--font-body);font-size:13px;color:var(--muted);font-weight:800}
+.lastline{margin-top:24px;text-align:center;font-size:12.5px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top" id="top"></header>
+  <main id="view"></main>
+  <nav class="tabbar" id="tabbar" aria-label="Navigation">
+    <div class="in">
+      <button class="tab" data-a="tab" data-v="spiele"><span class="ic">🎮</span>Spiele</button>
+      <button class="tab" data-a="tab" data-v="rangliste"><span class="ic">🏆</span>Rangliste</button>
+      <button class="tab" data-a="tab" data-v="profil"><span class="ic">👤</span>Profil</button>
+    </div>
+  </nav>
+</div>
+<div id="fx" aria-hidden="true"></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="ovl-root"></div>
+
+<script src="shared/core.js"></script>
+<script src="shared/firebase.js"></script>
+<script src="shared/games.js"></script>
+<script>
+/* ==========================================================================
+   HUB-LOGIK
+   Aufbau: 1. Einstellungen  2. Zustand & Speichern  3. Ansichten (Views)
+           4. Aktionen (Klicks)  5. Start
+   ========================================================================== */
+
+/* ---------- 1. Einstellungen ---------- */
+const HUB_NAME='Clash Club';            // Name im Fenstertitel und in Meldungen
+const HUB_LOGO=['CLASH','CLUB'];        // Logo: erster Teil gold, zweiter Teil weiß
+const HUB_VERSION='1.0.0';              // bei jeder Änderung hochzählen (siehe CHANGELOG.md)
+/* Testmodus: index.html?demo öffnet den Hub OHNE Datenbank mit Beispielspielern.
+   Nichts landet bei den Freunden. Gedacht zum Ausprobieren von Änderungen. */
+const DEMO=new URLSearchParams(location.search).has('demo');
+const DEMO_PROFILES={
+ d1:{name:'Beispiel-Anna',avatar:{skin:'#EDBB94',head:'oval',eyes:'zwinkern',mouth:'grinsen',hair:'lang',hc:'#C9873B',extra:'sommersprossen',shirt:'#22C98A',bg:'#5BC0FF'},banner:1,points:2350,wins:14,losses:6,correct:180,answered:240,bestTower:9,bestMath:42},
+ d2:{name:'Beispiel-Ben',avatar:{skin:'#A86D45',head:'rund',eyes:'sonnenbrille',mouth:'laecheln',hair:'muetze',hc:'#3D7BFF',extra:'ohne',shirt:'#FFC53D',bg:'#FF6B57'},banner:3,points:5100,wins:31,losses:9,correct:410,answered:520,bestTower:14,bestMath:77},
+ d3:{name:'Beispiel-Cem',avatar:{skin:'#F6D2B4',head:'eckig',eyes:'glupsch',mouth:'zunge',hair:'propeller',hc:'#2B1B12',extra:'brille',shirt:'#8A5CF6',bg:'#FFC53D'},banner:0,points:640,wins:3,losses:5,correct:60,answered:110,bestTower:4,bestMath:18}
+};
+
+/* ---------- 2. Zustand & Speichern ----------
+   H.me ist das eigene Profil. Es liegt in der Datenbank unter profiles/{uid}
+   und als Kopie im Browser (localStorage „ka_profile“, derselbe Schlüssel wie
+   in Brainclash – so sehen beide dasselbe, auch ohne Internet). */
+/* Im Testmodus ein eigener Speicherplatz, damit Brainclash das Testprofil NICHT
+   übernimmt (sonst würde es in die echte Datenbank hochgeladen – ist am 22.11. passiert). */
+const PROFILE_KEY=DEMO?'hub_demo_profile':'ka_profile';
+const H={online:false,uid:null,fs:null,me:null,profiles:{},onlineIds:new Set(),
+ view:{name:'loading'},tab:'spiele',boardGame:'gesamt'};
+
+/* Felder, die der Hub selbst verwaltet. Alles andere im Profil gehört den Spielen
+   und wird vom Hub nie überschrieben (Speichern mit merge). */
+const HUB_FIELDS=['name','avatar','banner'];
+
+async function saveMe(){
+ if(!H.me)return;H.me.lastSeen=Date.now();
+ LS.set(PROFILE_KEY,{...LS.get(PROFILE_KEY,{}),...H.me});
+ if(!H.online)return;
+ const d={lastSeen:H.me.lastSeen};HUB_FIELDS.forEach(k=>{if(H.me[k]!==undefined)d[k]=H.me[k]});
+ if(!H.me.createdAt){H.me.createdAt=Date.now();d.createdAt=H.me.createdAt}
+ try{await H.fs.doc('profiles/'+H.uid).set(d,{merge:true})}
+ catch(e){console.error(e);toast('Speichern hat nicht geklappt. Prüfe deine Internetverbindung.')}
+}
+const myPoints=()=>totalPoints(H.me||{},H.uid);
+const profileOf=id=>id===H.uid?H.me:H.profiles[id];
+const named=p=>p&&p.name&&p.name.length>=2;
+
+/* ---------- 3. Ansichten ---------- */
+const VIEWS_FULL=['loading','onboard','editor'];   // ohne Kopf- und Tab-Leiste
+function go(v){H.view=v;if(['spiele','rangliste','profil'].includes(v.name))H.tab=v.name;render(true)}
+function render(scrollTop){
+ const vw=$('#view');const st=vw.scrollTop;
+ const keep={};$$('#view input').forEach(i=>{if(i.id)keep[i.id]=i.value});
+ document.body.classList.toggle('full',VIEWS_FULL.includes(H.view.name));
+ renderTop();$$('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v===H.tab));
+ vw.innerHTML=(VIEWS[H.view.name]||VIEWS.spiele)(H.view);
+ for(const id in keep){const el=document.getElementById(id);if(el&&!el.value)el.value=keep[id]}
+ vw.scrollTop=scrollTop?0:st;
+}
+/* Neu zeichnen, wenn Daten kommen – aber nicht, während jemand tippt oder den Avatar baut. */
+function softRender(){if(!VIEWS_FULL.includes(H.view.name))render(false)}
+function renderTop(){
+ $('#top').innerHTML=`<div class="logo">${esc(HUB_LOGO[0])}<span>${esc(HUB_LOGO[1])}</span></div><div class="top-r">${H.online?`<span class="chip"><i class="live"></i>${H.onlineIds.size+1} online</span>`:''}${H.me?`<span class="chip gold">⭐ ${fmt(myPoints())}</span>`:''}</div>`;
+}
+
+/* Spielerkarte. own = eigenes Profil (zeigt „noch X Punkte bis …“). */
+function bannerHTML(p,id,own){
+ const pts=totalPoints(p,id);const L=levelFor(pts),cur=ptsForLevel(L),nxt=ptsForLevel(L+1);
+ const pct=Math.max(2,Math.min(100,Math.round((pts-cur)/(nxt-cur)*100)));
+ const b=BANNERS[p.banner||0]||BANNERS[0];
+ const played=GAMES.filter(g=>gamePoints(g,p,id)>0).length;
+ return `<div class="banner" style="background:${b.css}">
+  <div class="av">${avatarSVG(p.avatar)}</div>
+  <div class="who"><div class="bname">${esc(p.name||'Spieler')}</div><div class="btitle">${esc(hubTitleFor(L))}</div>
+   <div class="bstats"><span>⭐ ${fmt(pts)}</span><span>🎮 ${played} von ${GAMES.filter(g=>g.status==='live').length} Spielen</span></div>
+   <div class="xp"><i style="width:${pct}%"></i></div>
+   <div class="xpl">${own?`Noch ${fmt(nxt-pts)} Punkte bis Level ${L+1}`:`Level ${L}`}</div></div>
+  <div class="lvl"><b>${L}</b><small>LEVEL</small></div>
+  <div class="bulbs">${bulbs(16)}</div></div>`;
+}
+function noticeHTML(){
+ if(DEMO)return `<div class="notice"><b>Testmodus.</b> Ohne Datenbank, mit Beispielspielern. Änderungen bleiben nur in diesem Browser.</div>`;
+ if(H.online)return '';
+ return `<div class="notice"><b>Keine Verbindung zum Server.</b> Dein Profil wird erst mal nur auf diesem Gerät gespeichert. Rangliste und Online-Anzeige brauchen Internet.${HubFirebase.error?' Fehler: '+esc(HubFirebase.error):''}</div>`;
+}
+function editorBlock(v){
+ const a=v.av;const t=v.et||'skin';const colorTab=['skin','hc','shirt','bg'].includes(t);
+ const opts=AV[t].map(val=>{const on=a[t]===val;
+  if(colorTab)return `<button class="opt ${on?'on':''}" data-a="avSet" data-k="${t}" data-v="${val}" aria-label="Farbe"><span class="sw" style="background:${val}"></span></button>`;
+  return `<button class="opt ${on?'on':''}" data-a="avSet" data-k="${t}" data-v="${val}"><span class="th">${avatarSVG({...a,[t]:val})}</span><span>${esc((AVL[t]||{})[val]||val)}</span></button>`}).join('');
+ return `<div class="editor"><div class="prevwrap"><div class="preview" id="avprev">${avatarSVG(a)}</div><button class="dice" data-a="avRandom" aria-label="Zufälliger Charakter">🎲</button></div>
+ <div class="etabs">${ETABS.map(([k,n])=>`<button class="etab ${k===t?'on':''}" data-a="avTab" data-v="${k}">${n}</button>`).join('')}</div>
+ <div class="opts">${opts}</div></div>`;
+}
+function gameCardHTML(g){
+ const [g1,g2,sh]=g.farbe;const style=`--g1:${g1};--g2:${g2};--sh:${sh}`;
+ const tags=(g.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join('');
+ if(g.status!=='live')return `<div class="game soon"><div class="g-art">${g.emoji}</div><div class="g-body"><div class="g-row"><h3>${esc(g.name)}</h3><span class="pill">🛠️ Kommt bald</span></div><p>${esc(g.kurz)}</p></div></div>`;
+ const pts=H.me?gamePoints(g,H.me,H.uid):0;
+ return `<a class="game${g.dunkleSchrift?' dark':''}" href="${esc(g.pfad)}" style="${style}"><div class="g-art">${g.emoji}</div>
+  <div class="g-body"><div class="g-row"><h3>${esc(g.name)}</h3>${pts?`<span class="pill">⭐ ${fmt(pts)}</span>`:''}</div><p>${esc(g.kurz)}</p><div class="g-tags">${tags}</div></div>
+  <span class="g-play">Spielen ▶<b>${pts?'Weiter geht’s':'Neu für dich'}</b></span></a>`;
+}
+function onlineStripHTML(){
+ const ids=[...H.onlineIds].filter(id=>named(H.profiles[id]));
+ if(!ids.length)return `<div class="empty">Gerade ist niemand sonst da.<br><b>Schick deinen Freunden den Link</b>, dann seht ihr euch hier.</div>`;
+ return `<div class="strip">${ids.map(id=>{const p=H.profiles[id];return `<button class="pchip" data-a="showProfile" data-v="${esc(id)}"><span class="avwrap"><span class="av" style="display:block">${avatarSVG(p.avatar)}</span><i class="ondot"></i></span><span>${esc(p.name)}</span></button>`}).join('')}</div>`;
+}
+function rowHTML(id,p,i,val){
+ const medal=['🥇','🥈','🥉'][i];const on=id!==H.uid&&H.onlineIds.has(id);
+ return `<button class="row${id===H.uid?' me':''}" data-a="showProfile" data-v="${esc(id)}"><span class="rank${medal?' m':''}">${medal||i+1}</span>
+  <span class="avwrap"><span class="av" style="display:block">${avatarSVG(p.avatar)}</span>${on?'<i class="ondot"></i>':''}</span>
+  <span class="mid"><span class="t1" style="display:block">${esc(p.name)}${id===H.uid?' (du)':''}</span><span class="t2" style="display:block">Level ${levelFor(totalPoints(p,id))} · ${esc(hubTitleFor(levelFor(totalPoints(p,id))))}</span></span>
+  <span class="end">⭐ ${fmt(val)}</span></button>`;
+}
+function gameStatsHTML(p,id){
+ return GAMES.filter(g=>g.status==='live').map(g=>{const w=g.werte(p,standOf(g,id));
+  return `<div class="gstat"><h2 class="sec">${g.emoji} ${esc(g.name)} <a class="btn small ghost" href="${esc(g.pfad)}">Spielen</a></h2><div class="stats">${w.map(([v,l])=>`<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('')}</div></div>`}).join('');
+}
+
+const VIEWS={
+loading(){return `<div class="loading"><div class="spinq">🎮</div><div class="hero-logo" style="font-size:40px">${esc(HUB_LOGO[0])}<span>${esc(HUB_LOGO[1])}</span></div><div class="marquee">${bulbs(9)}</div><p class="muted">Die Lichter gehen an …</p></div>`},
+
+onboard(v){return `<div class="hero-logo">${esc(HUB_LOGO[0])}<span>${esc(HUB_LOGO[1])}</span></div><div class="marquee">${bulbs(9)}</div>
+ <p class="lead">Die Spielhalle für dich und deine Freunde. Ein Charakter für alle Spiele. Erst mal: Wer bist du?</p>
+ ${noticeHTML()}
+ <label class="lbl" for="nm">Dein Spielername</label>
+ <input id="nm" class="inp" maxlength="16" placeholder="z. B. Quizkönig" autocomplete="off" value="${esc(v.nm||'')}">
+ <label class="lbl">Dein Charakter</label>${editorBlock(v)}
+ <button class="btn big" data-a="finishOnboard">Rein in den Club 🎤</button>`},
+
+editor(v){return `<div class="qtop"><button class="xbtn" data-a="tab" data-v="profil" aria-label="Zurück">←</button><div class="qlabel">Charakter bearbeiten</div><span style="width:42px"></span></div>
+ <label class="lbl" for="nm">Spielername</label><input id="nm" class="inp" maxlength="16" autocomplete="off" value="${esc(v.nm)}">
+ ${editorBlock(v)}<button class="btn big" data-a="saveEditor">Speichern</button>`},
+
+spiele(){
+ const live=GAMES.filter(g=>g.status==='live'),soon=GAMES.filter(g=>g.status!=='live');
+ return `${noticeHTML()}<a class="bannerlink" href="#" data-a="tab" data-v="profil" aria-label="Zu deinem Profil">${bannerHTML(H.me,H.uid,true)}</a>
+ <h2 class="sec">Spiele <small>${live.length} spielbar</small></h2>
+ <div class="games">${live.map(gameCardHTML).join('')}${soon.map(gameCardHTML).join('')}
+  ${soon.length?'':`<div class="game soon"><div class="g-art">➕</div><div class="g-body"><div class="g-row"><h3>Nächstes Spiel</h3><span class="pill">🛠️ In Arbeit</span></div><p>Hier kommt das nächste Spiel hin. Dein Charakter und deine Punkte kommen automatisch mit.</p></div></div>`}</div>
+ ${H.online||DEMO?`<h2 class="sec">Gerade online <small>${H.onlineIds.size} Freunde</small></h2>${onlineStripHTML()}`:''}
+ <p class="lastline">${esc(HUB_NAME)} · Version ${HUB_VERSION}</p>`},
+
+rangliste(){
+ const tabs=[['gesamt','⭐ Gesamt'],...GAMES.filter(g=>g.status==='live').map(g=>[g.id,`${g.emoji} ${g.name}`])];
+ const sel=tabs.some(t=>t[0]===H.boardGame)?H.boardGame:'gesamt';
+ const all={...H.profiles};if(H.me&&H.uid)all[H.uid]=H.me;
+ const val=(p,id)=>sel==='gesamt'?totalPoints(p,id):gamePoints(GAME[sel],p,id);
+ const list=Object.entries(all).filter(([,p])=>named(p)).map(([id,p])=>[id,p,val(p,id)]).sort((a,b)=>b[2]-a[2]).slice(0,100);
+ return `<h2 class="sec">Rangliste <small>${list.length} Spieler</small></h2>
+ <div class="seg" role="tablist">${tabs.map(([k,n])=>`<button class="${k===sel?'on':''}" data-a="boardTab" data-v="${k}" role="tab" aria-selected="${k===sel}">${esc(n)}</button>`).join('')}</div>
+ <div class="list" style="margin-top:12px">${list.length?list.map(([id,p,v],i)=>rowHTML(id,p,i,v)).join(''):`<div class="empty">${H.online?'Noch keine Spieler.':'Die Rangliste braucht eine Internetverbindung.'}</div>`}</div>`},
+
+profil(){
+ const L=levelFor(myPoints());
+ return `${bannerHTML(H.me,H.uid,true)}
+ <div class="acts" style="display:grid;gap:10px;margin-top:16px"><button class="btn block" data-a="openEditor">✏️ Charakter bearbeiten</button></div>
+ <h2 class="sec">Banner <small>neue ab höherem Level</small></h2>
+ <div class="bpick">${BANNERS.map((b,i)=>`<button class="bp${(H.me.banner||0)===i?' on':''}" style="background:${b.css}" data-a="setBanner" data-v="${i}" ${L<b.lv?'disabled':''} aria-label="${esc(b.n)}">${L<b.lv?`<span class="lk">🔒 Lvl ${b.lv}</span>`:''}</button>`).join('')}</div>
+ ${gameStatsHTML(H.me,H.uid)}
+ <p class="lastline">Dein Profil gilt für alle Spiele im ${esc(HUB_NAME)}. Es ist an diesen Browser gebunden. Wer Browserdaten löscht oder das Gerät wechselt, startet mit einem neuen Profil.</p>`}
+};
+
+function showProfile(id){
+ const p=profileOf(id);if(!p)return;
+ openOverlay(`${bannerHTML(p,id,false)}${gameStatsHTML(p,id)}<div class="acts"><button class="btn ghost block" data-a="closeOvl">Schließen</button></div>`);
+}
+
+/* ---------- 4. Aktionen ----------
+   Jeder Knopf hat data-a="aktionsname" (und oft data-v="wert"). */
+const A={
+ tab(ds,el,e){e.preventDefault();closeOverlay();go({name:ds.v})},
+ boardTab(ds){H.boardGame=ds.v;render(false)},
+ showProfile(ds){showProfile(ds.v)},
+ closeOvl(){closeOverlay()},
+ ovlBg(ds,el,e){if(e.target===el)closeOverlay()},
+ avTab(ds){H.view.et=ds.v;render(false)},
+ avSet(ds){H.view.av={...H.view.av,[ds.k]:ds.v};render(false);const p=$('#avprev');p&&p.classList.add('bump')},
+ avRandom(){H.view.av=randomAvatar();render(false);const p=$('#avprev');p&&p.classList.add('bump')},
+ async finishOnboard(){
+  const nm=($('#nm').value||'').trim().slice(0,16);
+  if(nm.length<2){toast('Bitte gib einen Namen mit mindestens 2 Zeichen ein.');$('#nm').focus();return}
+  H.me={...(H.me||{}),name:nm,avatar:H.view.av,banner:(H.me&&H.me.banner)||0};
+  await saveMe();confetti(60);go({name:'spiele'});toast(`Willkommen im ${HUB_NAME}, ${nm}!`,{av:H.me.avatar});
+ },
+ openEditor(){go({name:'editor',av:{...DEFAULT_AV,...H.me.avatar},nm:H.me.name,et:'skin'})},
+ async saveEditor(){
+  const nm=($('#nm').value||'').trim().slice(0,16);if(nm.length<2){toast('Der Name braucht mindestens 2 Zeichen.');return}
+  H.me.name=nm;H.me.avatar=H.view.av;await saveMe();toast('Gespeichert',{av:H.me.avatar});go({name:'profil'});
+ },
+ setBanner(ds){H.me.banner=+ds.v;saveMe();render(false)}
+};
+document.addEventListener('click',e=>{
+ const el=e.target.closest('[data-a]');if(!el)return;const f=A[el.dataset.a];if(!f)return;
+ if(el.disabled)return;f(el.dataset,el,e);
+});
+
+/* ---------- 5. Start ---------- */
+async function boot(){
+ const cached=LS.get(PROFILE_KEY,null);
+ H.me=cached&&named(cached)?cached:null;
+ render(true);
+ if(DEMO){H.uid='demo-ich';H.profiles=DEMO_PROFILES;H.onlineIds=new Set(['d1','d2'])}
+ const fb=DEMO?null:await HubFirebase.start();
+ if(fb){
+  H.online=true;H.fs=fb.fs;H.uid=fb.uid;
+  try{const snap=await H.fs.doc('profiles/'+H.uid).get();
+   if(snap.exists&&named(snap.data()))H.me={...(H.me||{}),...snap.data()};
+   else if(H.me)saveMe();                    // Profil gab es nur auf dem Gerät → hochladen
+  }catch(e){console.error(e)}
+  /* Alle Profile live mitlesen (für Rangliste, Online-Leiste, eigene Punkte aus den Spielen). */
+  H.fs.collection('profiles').onSnapshot(s=>{const m={};s.docs.forEach(d=>{m[d.id]=d.data()});H.profiles=m;
+   const mine=m[H.uid];if(mine&&H.me&&!s.metadata.hasPendingWrites)H.me={...H.me,...mine};
+   renderTop();softRender()},e=>console.error(e));
+  /* Eigene Spielstände der Spiele, die das nutzen (spielstand:true in games.js). */
+  GAMES.filter(g=>g.spielstand).forEach(g=>{
+   H.fs.collection(`spielstand/${g.id}/spieler`).onSnapshot(s=>{const m={};s.docs.forEach(d=>{m[d.id]=d.data()});STAND[g.id]=m;renderTop();softRender()},()=>{});
+  });
+  HubFirebase.presence(H.fs,H.uid,ids=>{const a=[...ids].sort().join(),b=[...H.onlineIds].sort().join();H.onlineIds=ids;if(a!==b){renderTop();softRender()}});
+ }else if(!DEMO){H.uid='local'}
+ if(!H.me)go({name:'onboard',av:randomAvatar(),et:'skin'});
+ else go({name:H.tab});
+}
+boot();
+</script>
+</body>
+</html>
