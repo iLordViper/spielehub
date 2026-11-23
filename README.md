@@ -6,6 +6,7 @@ Spiele:
 1. **Brainclash** – Quiz-Duelle, Live-Duell, Party, Schätzfragen
 2. **Würfelclash** – Würfeln nach Original-Kniffel-Regeln mit 3D-Würfeln, Live-Duell, Bot, Chat ([Doku](docs/wuerfelclash.md))
 3. **Kritzelclash** – Einer malt, alle raten, 2–8 Freunde live ([Doku](docs/kritzelclash.md))
+4. **Puttclash** – Minigolf, 6 Plätze mit 36 Bahnen, solo oder reihum mit 2–8 Freunden ([Doku](docs/puttclash.md))
 
 Hauptprofil über alle Spiele: Level, Hub-Punkte, **Münzen 🪙** (Sieg 5, sonst 1 – nur Duelle gegen Freunde) und **Erfolge**.
 
@@ -31,6 +32,7 @@ Hauptprofil über alle Spiele: Level, Hub-Punkte, **Münzen 🪙** (Sieg 5, sons
 | `brainclash/index.html` | Das Quiz (eine Datei, wie bisher) |
 | `wuerfelclash/` | Das Würfelspiel: `index.html`, `regeln.js` (+ Test), `sounds/` |
 | `kritzelclash/` | Malen & Raten: `index.html`, `woerter.js` (+ Test) |
+| `puttclash/` | Minigolf: `index.html`, `physik.js` und `bahnen.js` (je + Test), `grafik.js`, `grafik-vorschau.html`, `FORMAT.md` |
 | `tools/datensicherung.mjs` | Sichert alle Spielerdaten aus der Datenbank als JSON auf diesen PC |
 | `tools/handy-vorschau.html` | Seite in Handygröße ansehen (`…/tools/handy-vorschau.html?seite=wuerfelclash/?demo`) |
 | `firestore.rules` | Sicherheitsregeln der Datenbank (Kopie dessen, was in Firebase eingestellt ist) |

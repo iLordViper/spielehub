@@ -84,6 +84,14 @@ service cloud.firestore {
         allow create, delete: if signedIn()
                       && request.auth.uid in get(/databases/$(database)/documents/partien/$(spiel)/liste/$(id)).data.players;
       }
+      // Schüsse (Puttclash): Pfad für die Geisterbälle. Nur Mitspieler, nur unter eigenem Namen.
+      match /schuesse/{schuss} {
+        allow read: if signedIn();
+        allow create: if signedIn() && request.resource.data.by == request.auth.uid
+                      && request.auth.uid in get(/databases/$(database)/documents/partien/$(spiel)/liste/$(id)).data.players;
+        allow delete: if signedIn()
+                      && request.auth.uid in get(/databases/$(database)/documents/partien/$(spiel)/liste/$(id)).data.players;
+      }
       // Chat einer Partie: nur Mitspieler schreiben, und nur unter eigenem Namen.
       // Nachrichten werden nie gelöscht (keine delete-Regel).
       match /chat/{msg} {

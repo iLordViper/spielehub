@@ -1,5 +1,30 @@
 # Änderungen
 
+## 1.3.0 – 23.11.2026 – Puttclash (Minigolf)
+
+**Neues Spiel: Puttclash** (`puttclash/`, Doku: `docs/puttclash.md`, Bauplan: `puttclash/FORMAT.md`)
+- Minigolf von oben: **6 Plätze mit 36 Bahnen** – 🌳 Sonnenpark, 🏜️ Wüstenoase, 🏴‍☠️ Piratenbucht, ❄️ Eispalast, 🌋 Vulkan, 🚀 Weltraum.
+- Hindernisse: Sand, Eis, Wasser, Lava, Abgründe, Hänge, Boosts, Bumper, Pfosten, pendelnde Blöcke, Mühlen, Schranken/Fallgitter, Teleporter.
+- Eigene Ballphysik (Bande, Reibung je Untergrund, Lip-out am Loch), auf allen Geräten gleich (101 Tests).
+- Grafik komplett gezeichnet, ohne Bilddateien: Mähstreifen, Holzbanden, Meer mit Strand, Basalt mit fließender Lava, Sternenhimmel, Fahne, Konfetti und Feuerwerk beim Hole-in-One. Kamera zoomt auf die Bahn, quer dreht sich das Feld.
+- Steuerung: aufs Feld tippen, zurückziehen, loslassen. Höchstens Par + 4 Schläge.
+- **Mit Freunden (2–8): reihum wie auf dem echten Platz** – ein Schlag, dann der Nächste, jeder Schlag live bei allen. Wer auf der letzten Bahn am besten war, fängt an. 40 s pro Schlag. Scorekarte zwischen den Bahnen.
+- Solo mit Bestwerten je Platz, laufende Solo-Runde wird gespeichert.
+- Chat im Warteraum und im Spiel, Sprechblasen 3 s, fliegende Emojis.
+- Münzen nur mit Freunden: Sieger 5, alle anderen 1.
+- Alle Bahnen von einem Bot geprüft (lösbar, Par mit „menschlicher“ Streuung abgestimmt; ~2.500 Bahn-Tests).
+
+**Hub**
+- Puttclash in der Spieleliste, 2 neue Erfolge („Hole-in-One!“, „Weltreise“ = alle 6 Plätze).
+
+**Datenbank** (in Firebase veröffentlicht, alte Regeln gesichert)
+- Neu: `partien/{spiel}/liste/{id}/schuesse` – nur Mitspieler, nur unter eigenem Namen.
+
+**Werkzeuge**
+- `tools/datensicherung.mjs` sichert jetzt auch Puttclash (ohne Schüsse).
+
+**Live-Test am 23.11.2026** (zwei Test-Spieler über die echte Datenbank): Einladung, Beitritt, Warteraum-Chat, reihum über alle 6 Bahnen, Zugzeit abgelaufen → Nächster dran, Seite neu laden mitten im Spiel, Scorekarte, Sieger, +5 🪙, +85 Hub-Punkte und Hole-in-One gespeichert und im Hub sichtbar. Behoben: Zeitanzeige zeigte nach einem Schuss kurz 50 statt 40 s. Testdaten gelöscht (eine Chat-Nachricht bleibt, Chats sind absichtlich nicht löschbar).
+
 ## 1.2.2 – 22.11.2026 – Kritzelclash: Chat, Querformat, kompakte Werkzeuge
 
 - **Chat für alle:** Warteraum-Chat; Zeichner kann schreiben (schmale Chat-Zeile hochkant, 💬-Knopf mit Zähler für den Verlauf), das gesuchte Wort wird dabei blockiert; Rater-Chat kompakter.
