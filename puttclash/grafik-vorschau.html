@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Puttclash · Grafik-Vorschau</title>
+<!--
+  PUTTCLASH · GRAFIK-VORSCHAU (grafik-vorschau.html)
+  Nur zum Anschauen und Prüfen der Grafik (grafik.js) – kein Spiel, keine Physik.
+  - Lädt bahnen.js (falls vorhanden), sonst die 6 eingebauten Beispielbahnen (je Platz eine).
+    Beispielplätze, die bahnen.js noch nicht hat (z. B. piraten, vulkan), werden zusätzlich gezeigt.
+  - So fügst du ein neues Thema zum Testen hinzu: zwischen BEISPIEL-START und BEISPIEL-ENDE einen
+    Platz {id:'<thema>', name, emoji, bahnen:[{…}]} anlegen (id = Schlüssel in GRAFIK.THEMEN).
+  - Oben die große Ansicht mit bewegten Objekten, Demo-Ball, Zielpfeil, zwei Geisterbällen.
+  - Unten alle Bahnen als Kacheln (Name, par) – antippen zeigt sie groß.
+  Bedienung große Ansicht: tippen = Ball hinsetzen (prüft bildZuFeld), vom Ball wegziehen
+  = zielen, loslassen = Probeschuss (rollt nur geradeaus mit Reibung, ohne echte Physik).
+-->
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+ body{overflow:auto;height:auto;min-height:100%}
+ .wrap{max-width:1180px;margin:0 auto;padding:12px max(16px,env(safe-area-inset-left,0px)) 40px}
+ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+ .buehne{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+ @media (max-width:820px){.buehne{grid-template-columns:minmax(0,1fr)}}
+ #rahmen{position:relative;width:100%;height:min(76vh,860px);min-height:320px;border-radius:18px;overflow:hidden;background:#000;
+   border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.45);touch-action:none}
+ #rahmen canvas{display:block;width:100%;height:100%}
+ .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
+ .panel h3{margin:0 0 8px;font-family:var(--font-display);font-weight:400;font-size:18px;letter-spacing:.3px}
+ .reihe{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+ .knopf{font-family:var(--font-display);font-size:15px;letter-spacing:.3px;padding:8px 12px;border-radius:12px;background:var(--surface-2);
+   border:1px solid var(--line);box-shadow:0 3px 0 var(--shadow);min-height:40px}
+ .knopf:active{transform:translateY(2px);box-shadow:0 1px 0 var(--shadow)}
+ .knopf.an{background:var(--gold);color:#2A1700;border-color:var(--gold);box-shadow:0 3px 0 var(--gold-deep)}
+ .klein{font-size:12.5px;line-height:1.45;margin:6px 0 0}
+ #titel{font-family:var(--font-display);font-weight:400;font-size:20px;margin:0}
+ .zeile{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 10px}
+ h2.sec{margin-top:26px}
+ .kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+ .kachel{display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px;text-align:left}
+ .kachel.aktiv{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+ .kachel canvas{width:100%;aspect-ratio:2/3;border-radius:9px;display:block;background:#000}
+ .kachel .n{font-weight:900;font-size:13.5px;line-height:1.2}
+ .kachel .m{font-size:11.5px;color:var(--muted);font-weight:800}
+ code{font-size:12px;color:var(--sky)}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <header>
+  <div class="logo">PUTT<span>CLASH</span></div>
+  <span class="chip">Grafik-Vorschau</span>
+  <span class="chip" id="quelle"></span>
+  <span class="chip" id="fps">– fps</span>
+ </header>
+
+ <section class="buehne">
+  <div>
+   <div id="rahmen"><canvas id="gross"></canvas></div>
+   <div class="zeile"><p id="titel"></p><span class="chip" id="info"></span></div>
+  </div>
+  <div class="panel">
+   <h3>Effekte</h3>
+   <div class="reihe" id="effekte"></div>
+   <h3>Ansicht</h3>
+   <div class="reihe">
+    <button class="knopf" id="kDreh">Ausrichtung: Auto</button>
+    <button class="knopf an" id="kZiel">Zielhilfe</button>
+    <button class="knopf an" id="kGeist">Geister</button>
+    <button class="knopf" id="kPause">Zeit anhalten</button>
+    <button class="knopf" id="kSchuss">Probeschuss</button>
+    <button class="knopf" id="kStart">Ball zum Start</button>
+   </div>
+   <p class="klein muted">Tippen = Ball hinsetzen (prüft <code>bildZuFeld</code>). Vom Ball wegziehen = zielen, loslassen = Probeschuss
+    (rollt nur geradeaus mit Reibung und prallt grob am Rand ab – <b>keine</b> echte Physik).</p>
+   <p class="klein muted" id="pruef"></p>
+  </div>
+ </section>
+
+ <div id="kachelBereich"></div>
+</div>
+
+<script src="bahnen.js"></script>
+<script src="grafik.js"></script>
+<script>
+(function(){
+'use strict';
+/* ---------- Beispielbahnen (nur falls bahnen.js fehlt): je Platz eine, mit allen Zonen/Objekten ---------- */
+/*BEISPIEL-START*/
+const BEISPIEL=[
+ {id:'park',name:'Sonnenpark',emoji:'🌳',bahnen:[{
+  id:'park-1',name:'Gartenweg',par:3,start:{x:500,y:1330},loch:{x:500,y:260},
+  rand:[150,1450, 850,1450, 850,760, 700,600, 700,150, 300,150, 300,600, 150,760],
+  waende:[[390,1130, 610,1130]],
+  zonen:[
+   {typ:'sand',form:{kreis:[610,390,62]}},
+   {typ:'hang',form:{rect:[310,620,380,150]},richtung:[0,1],staerke:1},
+   {typ:'wasser',form:{poly:[180,880, 380,860, 420,960, 330,1040, 190,1010]}},
+   {typ:'boost',form:{kreis:[720,1260,34]},richtung:[0,-1],staerke:1}
+  ],
+  objekte:[
+   {typ:'bumper',x:700,y:990,r:26,kraft:1.4},
+   {typ:'pfosten',x:400,y:470,r:14},{typ:'pfosten',x:260,y:1300,r:14},
+   {typ:'muehle',x:560,y:900,laenge:110,fluegel:4,periode:4000}
+  ],
+  deko:[{typ:'baum',x:70,y:260,s:1.1},{typ:'baum',x:930,y:330},{typ:'baum',x:930,y:1330,s:.9},{typ:'baum',x:70,y:1390},
+   {typ:'busch',x:60,y:880},{typ:'busch',x:945,y:640},{typ:'busch',x:220,y:70},
+   {typ:'blume',x:90,y:560},{typ:'blume',x:115,y:620},{typ:'blume',x:930,y:960},{typ:'blume',x:960,y:1010},{typ:'blume',x:905,y:1080},
+   {typ:'stein',x:945,y:1180},{typ:'stein',x:60,y:700,s:.8},{typ:'fahne',x:950,y:830}]
+ }]},
+ {id:'wueste',name:'Wüstenoase',emoji:'🌵',bahnen:[{
+  id:'wueste-1',name:'Oasenkurve',par:4,start:{x:500,y:1340},loch:{x:690,y:270},
+  rand:[200,1450, 800,1450, 800,1000, 900,900, 900,150, 380,150, 380,650, 200,800],
+  waende:[],
+  zonen:[
+   {typ:'wasser',form:{kreis:[480,960,95]}},
+   {typ:'sand',form:{poly:[520,380, 700,420, 760,560, 600,600, 500,500]}},
+   {typ:'hang',form:{rect:[420,660,440,140]},richtung:[-0.7071,0.7071],staerke:1.2},
+   {typ:'lava',form:{rect:[640,1290,130,90]}}
+  ],
+  objekte:[
+   {typ:'block',rect:[430,1180,140,40],bahn:[170,0],periode:3000},
+   {typ:'muehle',x:500,y:260,laenge:85,fluegel:3,periode:-5000},
+   {typ:'bumper',x:300,y:1320,r:24,kraft:1.4},{typ:'pfosten',x:700,y:1100,r:14}
+  ],
+  deko:[{typ:'palme',x:110,y:1000,s:1.1},{typ:'palme',x:120,y:1260,s:.9},{typ:'palme',x:965,y:1100},{typ:'palme',x:975,y:1420,s:.8},
+   {typ:'kaktus',x:100,y:450},{typ:'kaktus',x:960,y:700},{typ:'kaktus',x:300,y:85},
+   {typ:'stein',x:120,y:620},{typ:'stein',x:960,y:1250},{typ:'fahne',x:60,y:150}]
+ }]},
+ {id:'eis',name:'Gletscher',emoji:'❄️',bahnen:[{
+  id:'eis-1',name:'Gletscherspalte',par:4,start:{x:500,y:1340},loch:{x:500,y:280},
+  rand:[250,1450, 750,1450, 900,1100, 900,500, 750,150, 250,150, 100,500, 100,1100],
+  waende:[[110,520, 350,520],[650,520, 890,520]],
+  zonen:[
+   {typ:'eis',form:{rect:[130,600,740,460]}},
+   {typ:'loch',form:{poly:[600,760, 720,740, 760,830, 690,900, 610,870]}},
+   {typ:'wasser',form:{kreis:[300,350,65]}},
+   {typ:'sand',form:{rect:[560,1150,170,110]}}
+  ],
+  objekte:[
+   {typ:'tor',x:500,y:520,b:300,offen:1400,zu:1100},
+   {typ:'pfosten',x:360,y:820,r:16},{typ:'pfosten',x:500,y:700,r:16},
+   {typ:'bumper',x:300,y:1230,r:24,kraft:1.4}
+  ],
+  deko:[{typ:'baum',x:40,y:250},{typ:'baum',x:960,y:280,s:1.1},{typ:'baum',x:960,y:1360,s:.9},{typ:'baum',x:50,y:1350},
+   {typ:'schneemann',x:50,y:820},{typ:'eiskristall',x:960,y:820},{typ:'eiskristall',x:40,y:600},{typ:'eiskristall',x:500,y:75},
+   {typ:'stein',x:930,y:1450}]
+ }]},
+ {id:'weltraum',name:'Sternenstation',emoji:'🚀',bahnen:[{
+  id:'weltraum-1',name:'Schwerelos',par:4,start:{x:500,y:1350},loch:{x:500,y:230},
+  rand:[200,1450, 800,1450, 800,1150, 950,1000, 950,600, 800,450, 800,120, 200,120, 200,450, 50,600, 50,1000, 200,1150],
+  waende:[],
+  zonen:[
+   {typ:'loch',form:{kreis:[500,800,120]}},
+   {typ:'boost',form:{kreis:[170,800,40]},richtung:[0.5,-0.866],staerke:1.5},
+   {typ:'boost',form:{kreis:[830,800,40]},richtung:[-0.5,-0.866],staerke:1.5},
+   {typ:'eis',form:{rect:[560,1180,180,80]}},
+   {typ:'lava',form:{rect:[260,1180,160,70]}}
+  ],
+  objekte:[
+   {typ:'tele',a:{x:500,y:1060},b:{x:500,y:560},r:28},
+   {typ:'bumper',x:330,y:380,r:24,kraft:1.4},{typ:'bumper',x:670,y:380,r:24,kraft:1.4},{typ:'bumper',x:500,y:430,r:20,kraft:1.6},
+   {typ:'muehle',x:290,y:620,laenge:80,fluegel:4,periode:3500},
+   {typ:'block',rect:[600,600,140,32],bahn:[0,70],periode:2600}
+  ],
+  deko:[{typ:'planet',x:90,y:250,s:1.1},{typ:'planet',x:920,y:1330,s:1.3},{typ:'planet',x:910,y:250,s:.8},
+   {typ:'rakete',x:100,y:1300,s:1.1},{typ:'stern',x:960,y:520,s:.8},{typ:'stern',x:30,y:1150},{typ:'stern',x:480,y:60},{typ:'stern',x:960,y:1460,s:.7}]
+ }]},
+ {id:'piraten',name:'Piratenbucht',emoji:'🏴‍☠️',bahnen:[{
+  id:'piraten-1',name:'Schatzinsel',par:4,start:{x:500,y:1340},loch:{x:620,y:260},
+  rand:[220,1450, 780,1450, 860,1180, 860,700, 900,420, 820,150, 380,150, 300,420, 140,640, 140,1080],
+  waende:[[640,1100, 860,1100]],
+  zonen:[
+   {typ:'wasser',form:{poly:[600,820, 780,790, 830,900, 760,1010, 610,990]}},
+   {typ:'sand',form:{kreis:[400,330,70]}},
+   {typ:'hang',form:{rect:[300,600,540,120]},richtung:[0.7071,-0.7071],staerke:1},
+   {typ:'sand',form:{rect:[300,1240,140,90]}}
+  ],
+  objekte:[
+   {typ:'block',rect:[260,1170,110,40],bahn:[90,0],periode:3200},
+   {typ:'tor',x:560,y:470,b:240,offen:1300,zu:1100},
+   {typ:'bumper',x:250,y:760,r:24,kraft:1.4},{typ:'bumper',x:700,y:1250,r:24,kraft:1.4},
+   {typ:'muehle',x:380,y:900,laenge:100,fluegel:4,periode:4200},
+   {typ:'pfosten',x:520,y:1080,r:14},
+   {typ:'tele',a:{x:220,y:1020},b:{x:760,y:380},r:28}
+  ],
+  deko:[{typ:'palme',x:60,y:300,s:1.1},{typ:'palme',x:950,y:620,s:1.1},{typ:'palme',x:70,y:1330},{typ:'palme',x:600,y:60,s:.9},
+   {typ:'fass',x:945,y:1000},{typ:'fass',x:975,y:1060,s:.8},{typ:'anker',x:60,y:880},{typ:'schatzkiste',x:930,y:230},
+   {typ:'steuerrad',x:70,y:1130},{typ:'muschel',x:110,y:1450},{typ:'muschel',x:960,y:1420},{typ:'muschel',x:50,y:560,s:.8},
+   {typ:'stein',x:945,y:1300},{typ:'stein',x:250,y:70,s:.8},{typ:'gibtsnicht',x:500,y:500},{typ:'constructor',x:10,y:10}]
+ }]},
+ {id:'vulkan',name:'Vulkan',emoji:'🌋',bahnen:[{
+  id:'vulkan-1',name:'Glutpfad',par:4,start:{x:500,y:1350},loch:{x:380,y:250},
+  rand:[200,1450, 800,1450, 820,1100, 900,900, 880,500, 760,150, 240,150, 120,480, 160,900, 220,1100],
+  waende:[[620,300, 760,300]],
+  zonen:[
+   {typ:'lava',form:{poly:[420,760, 620,720, 700,820, 640,930, 460,920, 380,840]}},
+   {typ:'hang',form:{rect:[230,1000,560,110]},richtung:[0,-1],staerke:1.3},
+   {typ:'sand',form:{rect:[560,1150,180,110]}},
+   {typ:'lava',form:{kreis:[740,440,55]}},
+   {typ:'loch',form:{kreis:[230,640,50]}}
+  ],
+  objekte:[
+   {typ:'bumper',x:320,y:560,r:26,kraft:1.5},{typ:'bumper',x:770,y:650,r:22,kraft:1.4},
+   {typ:'block',rect:[280,1250,120,40],bahn:[60,0],periode:2800},
+   {typ:'muehle',x:540,y:520,laenge:110,fluegel:3,periode:-4200},
+   {typ:'tor',x:380,y:380,b:200,offen:1300,zu:1000},
+   {typ:'pfosten',x:480,y:1060,r:14}
+  ],
+  deko:[{typ:'fels',x:70,y:400,s:1.1},{typ:'fels',x:950,y:1250},{typ:'glutstein',x:960,y:760},{typ:'glutstein',x:60,y:1000,s:.9},
+   {typ:'duerrbaum',x:80,y:1320},{typ:'duerrbaum',x:950,y:250},{typ:'rauch',x:940,y:1050},{typ:'rauch',x:60,y:720},{typ:'rauch',x:520,y:80},
+   {typ:'kristall',x:60,y:200},{typ:'kristall',x:960,y:1430,s:.8},{typ:'stein',x:120,y:1440},{typ:'stein',x:900,y:80,s:.7}]
+ }]}
+];
+/*BEISPIEL-ENDE*/
+
+/* Plätze aus bahnen.js haben Vorrang. Beispielplätze, deren id bahnen.js (noch) nicht kennt,
+   werden hinten angehängt – so lassen sich neue Themen schon vor ihren echten Bahnen prüfen. */
+const echt=typeof BAHNEN!=='undefined'&&BAHNEN&&Array.isArray(BAHNEN.PLAETZE)&&BAHNEN.PLAETZE.length>0;
+const bekannt=new Set(echt?BAHNEN.PLAETZE.map(p=>p.id):[]);
+const extra=BEISPIEL.filter(p=>!bekannt.has(p.id));
+const PLAETZE=echt?BAHNEN.PLAETZE.concat(extra):BEISPIEL;
+document.getElementById('quelle').textContent=!echt?'Beispielbahnen (bahnen.js fehlt)'
+ :extra.length?'bahnen.js + Beispiel: '+extra.map(p=>p.id).join(', '):'Bahnen aus bahnen.js';
+
+const $=id=>document.getElementById(id);
+const rahmen=$('rahmen'),cv=$('gross'),ctx=cv.getContext('2d');
+let wahl={platz:PLAETZE[0],bahn:PLAETZE[0].bahnen[0]};
+let modus='auto',zielAn=true,geisterAn=true,pause=false,pauseBei=0,zeitVersatz=0;
+let kam=null,cssB=0,cssH=0;
+const ball={x:0,y:0,vx:0,vy:0,rollt:false,versenkt:false};
+let spur=[],drag=null,letzterAbprall=0;
+
+const zeit=()=>pause?pauseBei:performance.now()-zeitVersatz;
+const randPunkte=b=>{const p=[];for(let i=0;i+1<b.rand.length;i+=2)p.push([b.rand[i],b.rand[i+1]]);return p};
+function imPoly(x,y,p){let inn=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const xi=p[i][0],yi=p[i][1],xj=p[j][0],yj=p[j][1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inn=!inn}return inn}
+let rp=randPunkte(wahl.bahn);
+const drin=(x,y)=>rp.length<3||imPoly(x,y,rp);
+
+function ballZumStart(){const s=wahl.bahn.start||{x:500,y:1300};ball.x=s.x;ball.y=s.y;ball.vx=ball.vy=0;ball.rollt=false;ball.versenkt=false;spur=[]}
+function waehle(platz,bahn){
+ wahl={platz,bahn};rp=randPunkte(bahn);ballZumStart();kamNeu();
+ $('titel').textContent=(platz.emoji||'')+' '+(bahn.name||bahn.id)+' · Par '+(bahn.par||'?');
+ document.querySelectorAll('.kachel').forEach(k=>k.classList.toggle('aktiv',k.dataset.id===bahn.id));
+}
+function kamNeu(){
+ const dreh=modus==='quer'||(modus==='auto'&&cssB>cssH*1.05);
+ kam=GRAFIK.kamera(wahl.bahn,cssB,cssH,dreh);
+ // Selbsttest: feldZuBild ↔ bildZuFeld
+ let maxF=0;for(let i=0;i<50;i++){const x=Math.random()*1000,y=Math.random()*1500,p=kam.feldZuBild(x,y),q=kam.bildZuFeld(p[0],p[1]);maxF=Math.max(maxF,Math.abs(q[0]-x),Math.abs(q[1]-y))}
+ $('pruef').textContent='Kamera: '+(dreh?'quer (gedreht)':'hochkant')+' · Skala '+kam.skala.toFixed(3)+' · Hin-und-zurück-Fehler '+maxF.toExponential(1);
+}
+function groesse(){
+ const r=rahmen.getBoundingClientRect();cssB=Math.max(1,r.width);cssH=Math.max(1,r.height);
+ const dpr=Math.min(window.devicePixelRatio||1,3);
+ cv.width=Math.round(cssB*dpr);cv.height=Math.round(cssH*dpr);kamNeu();
+}
+if(window.ResizeObserver)new ResizeObserver(groesse).observe(rahmen);else window.addEventListener('resize',groesse);
+
+/* ---------- Demo-Ball (keine Physik!) ---------- */
+function autoWinkel(t){const l=wahl.bahn.loch||{x:500,y:200};return Math.atan2(l.y-ball.y,l.x-ball.x)+Math.sin(t*.001)*.35}
+function schiesse(w,k){if(ball.rollt||ball.versenkt)return;const v=k*1700;ball.vx=Math.cos(w)*v;ball.vy=Math.sin(w)*v;ball.rollt=v>10;spur=[]}
+function bewege(dt){
+ if(ball.rollt){
+  const n=4,h=dt/n;
+  for(let i=0;i<n;i++){
+   let nx=ball.x+ball.vx*h,ny=ball.y+ball.vy*h;
+   if(!drin(nx,ny)){
+    if(!drin(nx,ball.y))ball.vx*=-.7;
+    if(!drin(ball.x,ny))ball.vy*=-.7;
+    if(drin(nx,ny)===false&&drin(nx,ball.y)&&drin(ball.x,ny)){ball.vx*=-.7;ball.vy*=-.7}
+    const now=performance.now();if(now-letzterAbprall>120){GRAFIK.effekt('funken',ball.x,ball.y);letzterAbprall=now}
+    nx=ball.x;ny=ball.y;
+   }
+   ball.x=nx;ball.y=ny;
+   const r=Math.exp(-1.1*h);ball.vx*=r;ball.vy*=r;
+   const l=wahl.bahn.loch,sp=Math.hypot(ball.vx,ball.vy);
+   if(l&&Math.hypot(ball.x-l.x,ball.y-l.y)<20&&sp<650){
+    ball.rollt=false;ball.versenkt=true;GRAFIK.effekt('konfetti',l.x,l.y);
+    setTimeout(ballZumStart,1600);break;
+   }
+   if(sp<14){ball.rollt=false;ball.vx=ball.vy=0;break}
+  }
+  spur.push([ball.x,ball.y]);if(spur.length>28)spur.shift();
+ }else if(spur.length)spur.shift();
+}
+
+/* ---------- Bildschleife ---------- */
+let alt=performance.now(),fz=0,ft=alt;
+function bild(ms){
+ const dt=Math.min(.05,(ms-alt)/1000);alt=ms;
+ if(!pause)bewege(dt);
+ const t=zeit(),b=wahl.bahn,L=b.loch||{x:500,y:250},S=b.start||{x:500,y:1300};
+ const baelle=[];
+ if(geisterAn){
+  baelle.push({x:L.x+Math.cos(t*.0011)*110,y:L.y+170+Math.sin(t*.0017)*70,farbe:'#FF6B57',name:'Anna',geist:true});
+  const u=.5+.5*Math.sin(t*.0006);
+  baelle.push({x:S.x+(L.x-S.x)*u+Math.sin(t*.002)*60,y:S.y+(L.y-S.y)*u,farbe:'#3DDC97',name:'Ben',geist:true});
+ }
+ baelle.push({x:ball.x,y:ball.y,farbe:'#5BC0FF',name:'Ich',ich:true,versenkt:ball.versenkt});
+ let ziel=null;
+ if(zielAn&&!ball.rollt&&!ball.versenkt){
+  ziel=drag?{von:{x:ball.x,y:ball.y},winkel:drag.winkel,kraft:drag.kraft}
+           :{von:{x:ball.x,y:ball.y},winkel:autoWinkel(t),kraft:.5+.5*Math.sin(t*.0013)};
+ }
+ if(kam)GRAFIK.zeichne(ctx,b,wahl.platz.id,kam,{t,baelle,ziel,spur});
+ fz++;if(ms-ft>500){$('fps').textContent=Math.round(fz*1000/(ms-ft))+' fps';fz=0;ft=ms}
+ requestAnimationFrame(bild);
+}
+
+/* ---------- Eingabe ---------- */
+function feldPunkt(e){const r=cv.getBoundingClientRect();return kam.bildZuFeld(e.clientX-r.left,e.clientY-r.top)}
+cv.addEventListener('pointerdown',e=>{
+ if(!kam)return;const p=feldPunkt(e);
+ $('info').textContent='Feld '+Math.round(p[0])+' / '+Math.round(p[1]);
+ if(ball.rollt||ball.versenkt)return;
+ if(Math.hypot(p[0]-ball.x,p[1]-ball.y)<70){drag={winkel:0,kraft:0};cv.setPointerCapture(e.pointerId)}
+ else if(drin(p[0],p[1])){ball.x=p[0];ball.y=p[1];spur=[]}
+ else GRAFIK.effekt('funken',p[0],p[1]);
+});
+cv.addEventListener('pointermove',e=>{
+ if(!drag||!kam)return;const p=feldPunkt(e),dx=ball.x-p[0],dy=ball.y-p[1];
+ drag.winkel=Math.atan2(dy,dx);drag.kraft=Math.min(1,Math.hypot(dx,dy)/260);
+});
+const loslassen=()=>{if(!drag)return;const d=drag;drag=null;if(d.kraft>.04)schiesse(d.winkel,d.kraft)};
+cv.addEventListener('pointerup',loslassen);cv.addEventListener('pointercancel',()=>{drag=null});
+
+/* ---------- Knöpfe ---------- */
+const EFFEKTE=[['platsch','💦 platsch'],['sand','🏜 sand'],['funken','✨ funken'],['konfetti','🎉 konfetti'],['tele','🌀 tele'],['boost','🚀 boost'],['holeinone','⛳ hole in one']];
+EFFEKTE.forEach(([art,txt])=>{
+ const k=document.createElement('button');k.className='knopf';k.textContent=txt;
+ k.onclick=()=>{
+  const th=GRAFIK.THEMEN[wahl.platz.id]||GRAFIK.THEMEN.park,b=wahl.bahn;
+  if(art==='tele'){const o=(b.objekte||[]).find(o=>o.typ==='tele');if(o){GRAFIK.effekt('tele',o.a.x,o.a.y,{nach:o.b,farbe:th.tele.a,farbe2:th.tele.b});return}}
+  if(art==='holeinone'){const l=b.loch||ball;GRAFIK.effekt('holeinone',l.x,l.y);return}
+  if(art==='boost'){GRAFIK.effekt('boost',ball.x,ball.y,{winkel:autoWinkel(zeit())});return}
+  if(art==='platsch'){GRAFIK.effekt('platsch',ball.x,ball.y,{farbe:th.wasser.flach});return}
+  GRAFIK.effekt(art,ball.x,ball.y);
+ };
+ $('effekte').appendChild(k);
+});
+const MODI=['auto','hoch','quer'],MNAME={auto:'Auto',hoch:'Hochkant',quer:'Quer'};
+$('kDreh').onclick=()=>{modus=MODI[(MODI.indexOf(modus)+1)%3];$('kDreh').textContent='Ausrichtung: '+MNAME[modus];kamNeu()};
+$('kZiel').onclick=e=>{zielAn=!zielAn;e.currentTarget.classList.toggle('an',zielAn)};
+$('kGeist').onclick=e=>{geisterAn=!geisterAn;e.currentTarget.classList.toggle('an',geisterAn)};
+$('kPause').onclick=e=>{
+ if(!pause){pauseBei=zeit();pause=true}else{zeitVersatz=performance.now()-pauseBei;pause=false}
+ e.currentTarget.classList.toggle('an',pause);
+};
+$('kSchuss').onclick=()=>schiesse(autoWinkel(zeit()),.55);
+$('kStart').onclick=ballZumStart;
+
+/* ---------- Kacheln (einmal gezeichnet, t = 0) ---------- */
+const bereich=$('kachelBereich'),warte=[];
+PLAETZE.forEach(platz=>{
+ const h=document.createElement('h2');h.className='sec';
+ h.innerHTML='<span></span><small></small>';
+ h.firstChild.textContent=(platz.emoji||'')+' '+(platz.name||platz.id);
+ h.lastChild.textContent=(platz.bahnen||[]).length+' Bahnen · Thema „'+platz.id+'“';
+ bereich.appendChild(h);
+ const grid=document.createElement('div');grid.className='kacheln';bereich.appendChild(grid);
+ (platz.bahnen||[]).forEach((bahn,i)=>{
+  const k=document.createElement('button');k.className='kachel';k.dataset.id=bahn.id;
+  const c=document.createElement('canvas'),n=document.createElement('div'),m=document.createElement('div');
+  n.className='n';n.textContent=(i+1)+'. '+(bahn.name||bahn.id);
+  m.className='m';m.textContent='Par '+(bahn.par||'?')+' · '+bahn.id;
+  k.append(c,n,m);grid.appendChild(k);
+  k.onclick=()=>{waehle(platz,bahn);window.scrollTo({top:0,behavior:'smooth'})};
+  warte.push(()=>{
+   const r=c.getBoundingClientRect(),b=Math.max(60,r.width),hh=b*1.5,dpr=Math.min(window.devicePixelRatio||1,2);
+   c.width=Math.round(b*dpr);c.height=Math.round(hh*dpr);
+   const km=GRAFIK.kamera(bahn,b,hh,false);
+   GRAFIK.zeichne(c.getContext('2d'),bahn,platz.id,km,{t:0,baelle:[{x:bahn.start.x,y:bahn.start.y,ich:true,farbe:'#5BC0FF'}],ziel:null,spur:[]});
+  });
+ });
+});
+function naechsteKachel(){const f=warte.shift();if(!f)return;try{f()}catch(e){console.error(e)}setTimeout(naechsteKachel,30)}
+
+groesse();
+waehle(wahl.platz,wahl.bahn);
+requestAnimationFrame(bild);
+setTimeout(naechsteKachel,200);
+})();
+</script>
+</body>
+</html>

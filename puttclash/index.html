@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="de">
+<head>
+<!-- ==========================================================================
+     PUTTCLASH (puttclash/index.html) – Spiel 4 im Spiele-Hub: Minigolf
+     --------------------------------------------------------------------------
+     4 Plätze à 6 Bahnen. Solo oder mit 2–8 Freunden – alle spielen dieselbe Bahn
+     GLEICHZEITIG, die Bälle der anderen fliegen als Geister mit.
+
+     Dateien (Vertrag: FORMAT.md):
+       physik.js   Ballphysik (PHYSIK.schuss …)       – von allen Geräten gleich benutzt
+       bahnen.js   die 24 Bahnen (BAHNEN.PLAETZE …)
+       grafik.js   Zeichnen (GRAFIK.kamera/zeichne …)
+       index.html  dieses Spiel: Menü, Raum, Steuerung, Live-Sync, Chat, Wertung
+
+     Gespeichert:
+       partien/puttclash/liste/{id}            Raum/Partie (Schläge je Spieler & Bahn)
+       partien/puttclash/liste/{id}/schuesse   jeder Schuss (Pfad für die Geisterbälle)
+       partien/puttclash/liste/{id}/chat       Chat
+       spielstand/puttclash/spieler/{uid}      Punkte, Münzen, Siege, Bestrunden, Hole-in-Ones
+       Browser: pc_stand (Kopie), pc_solo (laufende Solo-Runde), pc_ton
+     Testmodus ?demo: nur Solo, ohne Datenbank.
+     ========================================================================== -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Puttclash</title>
+<meta name="theme-color" content="#0E1A2B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9B%B3%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* ==========================================================================
+   Nur Puttclash. Spielansicht = ganze Bildschirmhöhe: Kopfzeile, Feld (Canvas), Fußleiste.
+   ========================================================================== */
+#app{max-width:1100px}
+span.av{display:block;flex:none;overflow:hidden;border-radius:50%}
+.top-l{display:flex;align-items:center;gap:10px;min-width:0}
+body.full #view{padding:0;overflow:hidden}
+.spiel{height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.kopf{flex:none;display:flex;align-items:center;gap:8px;padding:8px max(10px,env(safe-area-inset-left,0px)) 6px max(10px,env(safe-area-inset-right,0px))}
+.ibtn{flex:none;width:40px;height:40px;border-radius:12px;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;font-size:17px;position:relative;color:var(--ink)}
+.binfo{flex:1;min-width:0;text-align:center;line-height:1.1}
+.binfo b{display:block;font-family:var(--font-display);font-weight:400;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.binfo small{font-size:12px;font-weight:800;color:var(--muted)}
+.zaehler{flex:none;min-width:56px;text-align:center;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:3px 8px;line-height:1.05}
+.zaehler b{display:block;font-family:var(--font-display);font-size:20px;color:var(--gold);font-weight:400}
+.zaehler small{font-size:10px;font-weight:900;color:var(--muted);letter-spacing:.06em}
+.cbadge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;border-radius:10px;background:var(--coral);color:#fff;font-size:10.5px;font-style:normal;font-weight:900;display:grid;place-items:center;padding:0 5px;border:2px solid var(--bg)}
+.feld{flex:1;min-height:0;position:relative;touch-action:none}
+.feld canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hinweis{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(11,21,36,.82);border:1px solid var(--line);color:var(--ink);font-weight:800;font-size:13px;padding:6px 12px;border-radius:99px;pointer-events:none;white-space:nowrap;transition:opacity .3s}
+.fuss{flex:none;padding:6px max(10px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right,0px));display:grid;gap:6px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-top:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip2{flex:none;position:relative;display:flex;align-items:center;gap:6px;background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:3px 9px 3px 3px}
+.chip2 .av{width:28px;height:28px;border:2px solid var(--fa,#fff)}
+.chip2 .nm{font-size:11.5px;font-weight:900;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip2 .sc{font-family:var(--font-display);font-size:14px;color:var(--gold)}
+.chip2.ok{border-color:var(--mint)}
+.chip2.ich .nm{color:var(--gold)}
+.chip2.dran{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,197,61,.35);animation:dranPuls 1.2s ease-in-out infinite}
+@keyframes dranPuls{50%{box-shadow:0 0 0 5px rgba(255,197,61,.12)}}
+.chip2 .bl{position:absolute;left:0;bottom:calc(100% + 6px);z-index:9;max-width:200px;background:#F5F0E6;color:#14223A;font-weight:800;font-size:13px;padding:6px 10px;border-radius:12px;box-shadow:0 6px 16px rgba(0,0,0,.4);white-space:normal;overflow-wrap:anywhere;animation:bubIn .3s cubic-bezier(.2,1.5,.4,1),bubOut .35s ease-in forwards;animation-delay:0s,2.65s;pointer-events:none}
+.chip2 .bl::after{content:"";position:absolute;left:14px;bottom:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#F5F0E6}
+@keyframes bubIn{from{transform:translateY(6px) scale(.6);opacity:0}}
+@keyframes bubOut{to{transform:translateY(-6px);opacity:0}}
+.crow{display:flex;gap:8px;align-items:center}.crow .inp{flex:1;min-width:0;font-size:16px;min-height:42px;padding:8px 12px}
+.sendb{flex:none;width:42px;height:42px;border-radius:13px;background:var(--gold);color:#2A1700;font-size:18px;box-shadow:0 3px 0 var(--gold-deep);display:grid;place-items:center}
+.emorow{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.emorow::-webkit-scrollbar{display:none}
+.emo{flex:none;width:38px;height:38px;border-radius:12px;background:var(--surface-2);font-size:20px;display:grid;place-items:center}
+.fly{position:fixed;bottom:-70px;font-size:56px;z-index:66;pointer-events:none;animation:fly 2.6s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes fly{0%{transform:translateY(0) scale(.5)}18%{transform:translateY(-28vh) scale(1.35) rotate(-12deg)}100%{transform:translateY(-110vh) scale(1) rotate(14deg);opacity:.2}}
+/* Chat-Fenster von unten */
+.chatsheet{position:fixed;inset:0;z-index:50}
+.chatsheet .bg{position:absolute;inset:0;background:rgba(5,10,20,.55)}
+.chatsheet .pn{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;max-height:70svh;display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;padding:12px max(12px,env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-right,0px));animation:hoch .25s ease-out}
+@keyframes hoch{from{transform:translateY(40%);opacity:.5}}
+.chatsheet .kz{display:flex;align-items:center;justify-content:space-between;font-family:var(--font-display);font-size:20px}
+.msgs{flex:1;min-height:100px;max-height:44svh;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:4px 2px}
+.m{font-size:14.5px;line-height:1.35;overflow-wrap:anywhere;padding:3px 6px}
+.m b{color:var(--sky);margin-right:5px}.m.ich b{color:var(--gold)}
+.m.sys{color:var(--muted);font-weight:800;font-size:13px;text-align:center}
+/* Scorekarte */
+.karte{overflow-x:auto;margin-top:6px}
+.karte table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+.karte th,.karte td{padding:5px 6px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+.karte th{color:var(--muted);font-size:11px;font-weight:900}
+.karte td.nm{text-align:left;font-weight:900;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.karte .u{color:var(--mint)}.karte .o{color:var(--coral)}.karte .ass{color:var(--gold);font-weight:900}
+.karte .sum{font-family:var(--font-display);font-size:16px;color:var(--gold)}
+.karte tr.akt td{background:rgba(255,197,61,.08)}
+/* Menü */
+.hero{text-align:center;padding-top:4px}
+.unter{font-weight:800;color:var(--muted);margin-top:4px}
+.plaetze{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.platz{position:relative;border-radius:20px;padding:14px;text-align:left;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;color:#fff;background:linear-gradient(150deg,var(--g1),var(--g2));box-shadow:0 6px 0 var(--sh);overflow:hidden;min-width:0}
+.platz:active{transform:translateY(5px);box-shadow:0 1px 0 var(--sh)}
+.platz .big{font-size:30px}
+.platz h3{font-family:var(--font-display);font-weight:400;font-size:20px;margin:0}
+.platz p{margin:2px 0 0;font-size:12px;font-weight:800;opacity:.92}
+.platz .rek{position:absolute;top:10px;right:10px;font-size:11px;font-weight:900;padding:3px 8px;border-radius:99px;background:rgba(0,0,0,.25)}
+.platz.on{outline:3px solid var(--gold);outline-offset:2px}
+.mode{position:relative;border-radius:22px;padding:14px;text-align:left;display:flex;align-items:center;gap:14px;width:100%;margin-top:12px;color:#fff;background:linear-gradient(150deg,var(--g1),var(--g2));box-shadow:0 6px 0 var(--sh)}
+.mode:disabled{filter:grayscale(.7);opacity:.6}
+.mode .big{font-size:34px}
+.mode h3{font-family:var(--font-display);font-weight:400;font-size:22px;margin:0}
+.mode p{margin:2px 0 0;font-size:12.5px;font-weight:800;opacity:.92}
+.tag{font-size:11.5px;font-weight:900;padding:4px 9px;border-radius:99px;background:var(--surface-2);white-space:nowrap}
+.tag.go{background:var(--gold);color:#2A1700}
+.raum{max-width:560px;margin:0 auto}
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px}
+.pslot{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;position:relative}
+.pslot .av{width:100%;max-width:60px;aspect-ratio:1;border:3px solid var(--fa,var(--surface-2))}
+.pslot.leer .av{border-style:dashed;display:grid;place-items:center;color:var(--muted);font-size:22px;background:var(--bg2)}
+.pslot .nm{font-size:12px;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pslot .kr{position:absolute;top:-8px;right:4px;font-size:16px}
+.chat{display:flex;flex-direction:column;gap:8px;background:var(--surface);border-radius:18px;padding:10px;border:2px solid var(--line)}
+.res{text-align:center;padding-top:10px;max-width:620px;margin:0 auto}
+.res h1{font-family:var(--font-display);font-weight:400;font-size:clamp(30px,9vw,44px);margin:6px 0 4px;color:var(--gold);text-shadow:0 4px 0 #6E4600}
+.acts{display:grid;gap:10px;margin-top:16px}
+.overlay{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(8,15,28,.72);backdrop-filter:blur(3px);animation:fade .25s}
+.overlay .kasten{width:min(100%,520px);max-height:100%;overflow:auto;background:var(--surface);border:2px solid var(--line);border-radius:20px;padding:14px;text-align:center}
+.overlay h3{font-family:var(--font-display);font-weight:400;font-size:24px;margin:0 0 4px}
+.ergebnis-gross{font-family:var(--font-display);font-size:clamp(34px,10vw,54px);color:var(--gold);text-shadow:0 4px 0 #6E4600;line-height:1}
+@media (orientation:landscape) and (max-height:560px){
+  .kopf{padding-top:4px;padding-bottom:2px}.ibtn{width:34px;height:34px}.zaehler b{font-size:17px}
+  .binfo b{font-size:16px}
+  .fuss{grid-template-columns:auto 1fr;align-items:center;padding-top:3px}
+  .fuss .crow .inp{min-height:36px;padding:5px 10px}.sendb{width:36px;height:36px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top" id="top"></header>
+  <main id="view"></main>
+</div>
+<div id="fx" aria-hidden="true"></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="ovl-root"></div>
+
+<script src="../shared/core.js"></script>
+<script src="../shared/firebase.js"></script>
+<script src="../shared/games.js"></script>
+<script src="physik.js"></script>
+<script src="bahnen.js"></script>
+<script src="grafik.js"></script>
+<script>
+/* ==========================================================================
+   SPIELLOGIK
+   1. Einstellungen   2. Statistik   3. Runde (Solo & Live gemeinsam)
+   4. Feld: Zeichnen, Zielen, Schießen, Geister   5. Raum & Live-Sync
+   6. Chat   7. Ansichten   8. Aktionen   9. Start
+   ========================================================================== */
+const GAME_ID='puttclash';
+const DEMO=new URLSearchParams(location.search).has('demo');
+const KEY=k=>(DEMO?'pc_demo_':'pc_')+k;
+const PROFILE_KEY=DEMO?'hub_demo_profile':'ka_profile';
+const PFAD=`partien/${GAME_ID}/liste`;
+const STAND_PFAD=`spielstand/${GAME_ID}/spieler`;
+const MAX_SPIELER=8;
+const ZWISCHENSTAND_MS=5000;          // Scorekarte zwischen zwei Bahnen
+const ZUG_ZEIT=40000;                 // so lange hat man Zeit für einen Schlag, wenn man dran ist
+const VERPASST_MAX=3;                 // 3× hintereinander verpasst → Bahn mit Höchstzahl beendet
+const MAX_ZIEH_PX=200;                // so weit ziehen = volle Kraft
+const FARBEN_SPIELER=['#FFC53D','#5BC0FF','#FF6B57','#3DDC97','#B38CFF','#FF7AD9','#F4EFE6','#FF9F43'];
+const EMOJIS=['😂','🔥','👏','😱','🙈','⛳','💀','😎'];
+/* Punkte je Bahn (relativ zu Par) → Hub-Punkte = Summe / 3. Münzen nur mit Freunden. */
+const BAHNPUNKTE=d=>d<=-3?80:d===-2?60:d===-1?40:d===0?25:d===1?12:d===2?6:3;
+const ASS_PUNKTE=100, MUENZEN={sieg:5,sonst:1};
+const maxSchlaege=b=>b.par+4;
+
+const P={online:false,fs:null,uid:null,me:null,stand:null,profiles:{},onlineIds:new Set(),view:{name:'loading'},
+ R:null,ref:null,unsub:[],chat:[],chatSeen:new Set(),chatNeu:0,bubbles:{},
+ runde:null,           // laufende Runde (Solo lokal, Live gespiegelt): {modus, platz, loch, schlaege:{uid:[..]}, ...}
+ ball:null,flug:null,geister:{},ziel:null,spur:[],kam:null,canvas:null,ctx:null,raf:0,myInvites:{},myGames:{}};
+
+/* ---------- 2. Statistik ---------- */
+const myName=()=>(P.me&&P.me.name)||'Du';
+const myAvatar=()=>(P.me&&P.me.avatar)||DEFAULT_AV;
+const neuStand=()=>({punkte:0,muenzen:0,runden:0,siege:0,holeInOne:0,bahnen:0,beste:{},plaetzeFertig:{},gezaehlt:[]});
+const muenzenGesamt=()=>((P.me&&P.me.muenzen)||0)+((P.stand&&P.stand.muenzen)||0);
+async function ladeStand(){P.stand={...neuStand(),...LS.get(KEY('stand'),{})};if(!P.online)return;
+ try{const s=await P.fs.doc(`${STAND_PFAD}/${P.uid}`).get();if(s.exists){P.stand={...neuStand(),...s.data()};LS.set(KEY('stand'),P.stand)}}catch(e){console.warn(e)}}
+async function speichereStand(){LS.set(KEY('stand'),P.stand);if(!P.online)return;try{await P.fs.doc(`${STAND_PFAD}/${P.uid}`).set(P.stand,{merge:true})}catch(e){console.warn(e)}}
+/* Eine fertige Runde genau einmal verbuchen. */
+function verbuche(runde){
+ const st=P.stand;if(!st||!runde||st.gezaehlt.includes(runde.id))return null;
+ const ich=runde.ich;const meine=runde.schlaege[ich]||[];const platz=BAHNEN.PLAETZE.find(p=>p.id===runde.platz);if(!platz)return null;
+ let pkt=0,ass=0;platz.bahnen.forEach((b,i)=>{const s=meine[i];if(!s)return;if(s===1){pkt+=ASS_PUNKTE;ass++}else pkt+=BAHNPUNKTE(s-b.par)});
+ const summe=meine.reduce((a,b)=>a+(b||0),0);const hub=Math.round(pkt/3);
+ st.runden++;st.punkte+=hub;st.holeInOne+=ass;st.bahnen+=meine.filter(Boolean).length;
+ if(!st.beste[runde.platz]||summe<st.beste[runde.platz])st.beste={...st.beste,[runde.platz]:summe};
+ st.plaetzeFertig={...st.plaetzeFertig,[runde.platz]:true};
+ let coins=0,sieg=false;if(runde.modus==='live'&&runde.spieler.length>1){sieg=runde.sieger===ich;coins=sieg?MUENZEN.sieg:MUENZEN.sonst;st.muenzen=(st.muenzen||0)+coins;if(sieg)st.siege++}
+ st.gezaehlt=[...st.gezaehlt,runde.id];speichereStand();return{hub,coins,ass,summe,sieg};
+}
+
+/* ---------- 3. Runde ----------
+   runde = {id, modus:'solo'|'live', platz, loch, ich, spieler:[uid], info:{uid:{name,avatar,farbe}},
+            schlaege:{uid:[Schläge je Bahn]}, fertig:{uid:[bool]}, aktuell:{uid:Schläge auf aktueller Bahn}} */
+const platzVon=id=>BAHNEN.PLAETZE.find(p=>p.id===id);
+const bahnVon=r=>platzVon(r.platz).bahnen[r.loch];
+function soloRunde(platz){
+ const ich=P.uid||'ich';return{id:'solo-'+Date.now().toString(36),modus:'solo',platz,loch:0,ich,spieler:[ich],
+  info:{[ich]:{name:myName(),avatar:myAvatar(),farbe:FARBEN_SPIELER[0]}},schlaege:{[ich]:[]},fertig:{[ich]:[]},aktuell:{[ich]:0},pos:{}};
+}
+function summeVon(r,uid){return (r.schlaege[uid]||[]).reduce((a,b)=>a+(b||0),0)}
+
+/* ---------- 4. Feld ---------- */
+function feldBauen(){
+ const f=$('#feld');if(!f)return;P.canvas=$('#cv');P.ctx=P.canvas.getContext('2d');groesse();
+ cancelAnimationFrame(P.raf);const loop=()=>{zeichneFeld();P.raf=requestAnimationFrame(loop)};P.raf=requestAnimationFrame(loop);
+}
+function groesse(){
+ const f=$('#feld');if(!f||!P.canvas||!P.runde)return;const r=f.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1);
+ P.canvas.width=Math.round(r.width*dpr);P.canvas.height=Math.round(r.height*dpr);
+ const b=bahnVon(P.runde);P.kam=GRAFIK.kamera(b,r.width,r.height,r.width>r.height*1.05);P.dpr=dpr;
+ try{GRAFIK.vorbereiten(b,P.runde.platz,P.kam,dpr)}catch(e){console.warn(e)}
+}
+window.addEventListener('resize',()=>{if(P.view.name==='spiel')groesse()});
+window.addEventListener('orientationchange',()=>setTimeout(()=>{if(P.view.name==='spiel')groesse()},250));
+
+/* Ball-Position aus einem Flug (Pfad abspielen). */
+function flugPos(fl,jetzt){const t=jetzt-fl.start;const p=fl.res.pfad;if(t>=fl.res.dauer||!p.length)return null;
+ let i=1;while(i<p.length&&p[i][0]<t)i++;if(i>=p.length)return{x:p[p.length-1][1],y:p[p.length-1][2]};
+ const a=p[i-1],b=p[i];const k=(t-a[0])/Math.max(1,b[0]-a[0]);return{x:a[1]+(b[1]-a[1])*k,y:a[2]+(b[2]-a[2])*k}}
+function zeichneFeld(){
+ const r=P.runde;if(!r||!P.ctx||!P.kam)return;const b=bahnVon(r);const jetzt=performance.now();const t=Date.now();
+ /* eigener Ball */
+ if(P.flug){const pos=flugPos(P.flug,jetzt);ereignisseAbspielen(P.flug,jetzt);if(pos){P.ball={...pos};P.spur.push([pos.x,pos.y]);if(P.spur.length>26)P.spur.shift()}else flugEnde()}
+ /* Geister */
+ const baelle=[];
+ for(const uid of r.spieler){if(uid===r.ich)continue;const g=P.geister[uid];const inf=r.info[uid]||{};let pos=g&&g.pos;
+  if(g&&g.flug){const p2=flugPos(g.flug,jetzt);if(p2)pos=p2;else{pos=g.flug.res.ende;g.pos=pos;if(g.flug.res.versenkt){g.versenkt=true}g.flug=null}}
+  if(!pos)pos=b.start;baelle.push({x:pos.x,y:pos.y,farbe:inf.farbe||'#fff',name:inf.name,ich:false,geist:true,versenkt:!!(g&&g.versenkt)||((r.fertig[uid]||[])[r.loch])})}
+ const ichFertig=(r.fertig[r.ich]||[])[r.loch];
+ if(P.ball)baelle.push({x:P.ball.x,y:P.ball.y,farbe:'#ffffff',name:myName(),ich:true,geist:false,versenkt:ichFertig&&!P.flug});
+ const ctx=P.ctx;ctx.setTransform(P.dpr,0,0,P.dpr,0,0);
+ try{GRAFIK.zeichne(ctx,b,r.platz,P.kam,{t,baelle,ziel:P.ziel,spur:P.flug?P.spur:[]})}catch(e){if(!P.grafikFehler){P.grafikFehler=1;console.error(e)}}
+}
+/* Töne und Effekte zu den Ereignissen des Pfads (Wand, Wasser, Loch …). */
+function ereignisseAbspielen(fl,jetzt){const t=jetzt-fl.start;const ev=fl.res.ereignisse||[];
+ while(fl.ei<ev.length&&ev[fl.ei][0]<=t){const [,art,x,y]=ev[fl.ei++];
+  const fx={wand:'funken',bumper:'funken',wasser:'platsch',sand:'sand',tele:'tele',boost:'boost'}[art];if(fx)try{GRAFIK.effekt(fx,x,y)}catch(e){}
+  if(fl.eigen||art==='loch'||art==='wasser')ton(art)}}
+/* Zielen: irgendwo aufs Feld tippen und ziehen – Schuss geht in die Gegenrichtung (wie eine Schleuder). */
+function kannSchiessen(){const r=P.runde;if(!r||P.flug||!P.ball)return false;if(r.modus==='live'&&(!P.R||P.R.status!=='laeuft'||P.R.pause||P.R.dran!==P.uid||P.zugWeg))return false;return !((r.fertig[r.ich]||[])[r.loch])}
+function zielStart(e){if(!kannSchiessen())return;e.preventDefault();P.canvas.setPointerCapture&&P.canvas.setPointerCapture(e.pointerId);P.zieh={x:e.clientX,y:e.clientY};P.ziel=null;zielBewegt(e)}
+function zielBewegt(e){if(!P.zieh)return;e.preventDefault();
+ const dx=P.zieh.x-e.clientX,dy=P.zieh.y-e.clientY;const d=Math.hypot(dx,dy);const kraft=Math.min(1,d/MAX_ZIEH_PX);
+ /* Richtung in Feldkoordinaten: Bildschirmvektor in Feld umrechnen (Kamera kann gedreht sein). */
+ const a=P.kam.bildZuFeld(0,0),b=P.kam.bildZuFeld(dx,dy);const winkel=Math.atan2(b[1]-a[1],b[0]-a[0]);
+ P.ziel=kraft<.04?null:{von:{x:P.ball.x,y:P.ball.y},winkel,kraft};setHinweis(P.ziel?`Kraft ${Math.round(kraft*100)} %`:'Ziehen zum Zielen')}
+function zielEnde(){if(!P.zieh)return;P.zieh=null;const z=P.ziel;P.ziel=null;if(!z){setHinweis('Ziehen und loslassen');return}schiessen(z.winkel,z.kraft)}
+function schiessen(winkel,kraft){
+ const r=P.runde;const b=bahnVon(r);const t0=Date.now();const start={x:P.ball.x,y:P.ball.y};
+ const res=PHYSIK.schuss(b,start,winkel,kraft,t0);ton('putt');
+ P.flug={res,start:performance.now(),ei:0,eigen:true,startPos:start,t0};P.spur=[];
+ r.aktuell[r.ich]=(r.aktuell[r.ich]||0)+1+(res.wasser?1:0);
+ if(r.modus==='live')sendeSchuss(r,start,res,t0);
+ setHinweis(res.wasser?'Platsch! +1 Strafschlag':'');zeichneKopf();
+}
+function flugEnde(){
+ const fl=P.flug;P.flug=null;const r=P.runde;const res=fl.res;P.ball={...res.ende};const b=bahnVon(r);
+ const n=r.aktuell[r.ich]||0;
+ if(res.versenkt){lochFertig(n);return}
+ if(n>=maxSchlaege(b)){toast(`Maximal ${maxSchlaege(b)} Schläge – die Bahn ist für dich beendet.`);lochFertig(maxSchlaege(b));return}
+ if(r.modus==='solo')LS.set(KEY('solo'),{runde:r,ball:P.ball});
+ if(r.modus==='live'){/* Reihum: Ball liegt → der Nächste ist dran */
+  P.zugWeg=true;P.ref.update({dran:naechsterDran(P.R,P.uid),zugStart:Date.now(),[`verpasst.${P.uid}`]:0,updatedAt:Date.now()}).catch(e=>console.warn(e));
+  setHinweis(res.wasser?'Platsch! +1 Strafschlag':'');zeichneKopf();return}
+ setHinweis(res.wasser?'Platsch! Zurück zum letzten Abschlag (+1)':'Ziehen und loslassen');zeichneKopf();
+}
+/* Reihum wie auf dem echten Platz: nächster Spieler nach `nach` in der Reihenfolge dieser Bahn,
+   der noch nicht im Loch und noch da ist. `auchFertig` = diesen Spieler als fertig behandeln. */
+function naechsterDran(R,nach,auchFertig){
+ const akt=aktive(R);const reihe=(R.reihe&&R.reihe.length?R.reihe:R.players).filter(p=>akt.includes(p));
+ akt.forEach(p=>{if(!reihe.includes(p))reihe.push(p)});if(!reihe.length)return null;
+ const fertig=p=>p===auchFertig||((R.fertig||{})[p]||[])[R.loch];const i=reihe.indexOf(nach);
+ for(let k=1;k<=reihe.length;k++){const p=reihe[(i+k+reihe.length)%reihe.length];if(!fertig(p))return p}
+ return null;
+}
+/* Reihenfolge für die nächste Bahn: wer auf der letzten die wenigsten Schläge hatte, fängt an (bei Gleichstand bleibt die alte Reihenfolge). */
+function neueReihe(d){const akt=aktive(d);const r=(d.reihe&&d.reihe.length?d.reihe:d.players).filter(p=>akt.includes(p));akt.forEach(p=>{if(!r.includes(p))r.push(p)});
+ const s=p=>((d.schlaege||{})[p]||[])[d.loch]||99;return r.slice().sort((a,b)=>s(a)-s(b))}
+/* Ab wann läuft die Zugzeit? Ab Zugbeginn – hat der Spieler in diesem Zug schon geschossen
+   (Ball rollt noch), bekommt er 14 s Kulanz ab dem Schuss. */
+function zugBeginn(R){const z=R.zugStart||0,g=R.geschossen||0;return g>z?Math.max(z,g+14000-ZUG_ZEIT):z}
+/* Hinweis unten: wer dran ist, Restzeit. */
+function zugHinweis(){const R=P.R,r=P.runde;if(!R||!r||r.modus!=='live'||P.view.name!=='spiel'||P.zieh||P.flug)return;
+ if(R.pause){setHinweis('');return}if((r.fertig[r.ich]||[])[r.loch]&&R.dran!==P.uid){setHinweis(R.dran?`${(R.info[R.dran]||{}).name} ist dran`:'');return}
+ const rest=Math.max(0,Math.ceil((ZUG_ZEIT-(Date.now()-zugBeginn(R)))/1000));
+ if(R.dran===P.uid&&!P.zugWeg)setHinweis(`Du bist dran! Ziehen und loslassen · ${rest} s`);else if(R.dran)setHinweis(`${(R.info[R.dran]||{}).name} ist dran${rest<=10?` · ${rest} s`:''}`)}
+function lochFertig(n){
+ const r=P.runde;const b=bahnVon(r);const d=n-b.par;
+ const titel=n===1?'HOLE IN ONE!':d<=-3?'ALBATROS!':d===-2?'EAGLE!':d===-1?'BIRDIE!':d===0?'PAR':d===1?'Bogey':d===2?'Doppel-Bogey':`+${d}`;
+ if(n===1){try{GRAFIK.effekt('holeinone',b.loch.x,b.loch.y)}catch(e){}confetti(140);ton('ass')}else{try{GRAFIK.effekt('konfetti',b.loch.x,b.loch.y)}catch(e){}if(d<=0)confetti(50);ton('loch')}
+ toast(`${titel} – ${n} ${n===1?'Schlag':'Schläge'} (Par ${b.par})`);
+ r.schlaege[r.ich]=[...(r.schlaege[r.ich]||[])];r.schlaege[r.ich][r.loch]=n;r.fertig[r.ich]=[...(r.fertig[r.ich]||[])];r.fertig[r.ich][r.loch]=true;
+ if(r.modus==='live'){P.zugWeg=true;P.ref.update({[`schlaege.${r.ich}`]:r.schlaege[r.ich],[`fertig.${r.ich}`]:r.fertig[r.ich],[`zuletzt.${r.ich}`]:Date.now(),[`verpasst.${r.ich}`]:0,
+  dran:naechsterDran(P.R,P.uid,P.uid),zugStart:Date.now(),updatedAt:Date.now()}).catch(e=>console.warn(e));zeichneKopf();setHinweis('Im Loch! Die anderen sind dran …');return}
+ /* Solo: nächste Bahn nach kurzer Pause */
+ LS.set(KEY('solo'),{runde:r,ball:null});setHinweis('');zeichneKopf();
+ setTimeout(()=>{if(P.runde!==r)return;if(r.loch>=platzVon(r.platz).bahnen.length-1){rundeEnde()}else zeigeZwischenstand(()=>naechsteBahnLokal())},1400);
+}
+function naechsteBahnLokal(){const r=P.runde;r.loch++;r.aktuell={[r.ich]:0};P.ball={...bahnVon(r).start};P.geister={};LS.set(KEY('solo'),{runde:r,ball:P.ball});go({name:'spiel'})}
+function setHinweis(t){const h=$('#hinweis');if(h){h.textContent=t||'';h.style.opacity=t?1:0}}
+
+/* ---------- 5. Raum & Live-Sync ---------- */
+const aktive=R=>R.players.filter(p=>!(R.weg||[]).includes(p));
+async function raumAnlegen(gegner,platz){
+ if(!P.online){toast('Dafür brauchst du Internet.');return}if(!(P.me&&P.me.name)){holeProfil();return}
+ const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+ const R={id,host:P.uid,players:[P.uid],info:{[P.uid]:{name:myName(),avatar:myAvatar(),farbe:FARBEN_SPIELER[0]}},invited:gegner||[],status:'lobby',
+  platz:platz||'park',loch:0,schlaege:{[P.uid]:[]},fertig:{[P.uid]:[]},zuletzt:{},weg:[],pause:0,createdAt:Date.now(),updatedAt:Date.now(),winner:null};
+ try{await P.fs.doc(`${PFAD}/${id}`).set(R)}catch(e){console.error(e);toast(e.code==='permission-denied'?'Die Datenbank ist für Puttclash noch nicht freigeschaltet.':'Raum konnte nicht angelegt werden.');return}
+ oeffneRaum(id);
+}
+async function beitreten(id){
+ if(!P.online){toast('Dafür brauchst du Internet.');return}if(!(P.me&&P.me.name)){holeProfil();return}
+ const ref=P.fs.doc(`${PFAD}/${id}`);
+ try{await P.fs.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists)throw new Error('weg');const d=s.data();if(d.players.includes(P.uid))return;
+  if(d.status!=='lobby')throw new Error('laeuft');if(d.players.length>=MAX_SPIELER)throw new Error('voll');
+  const farbe=FARBEN_SPIELER.find(f=>!Object.values(d.info).some(i=>i.farbe===f))||FARBEN_SPIELER[d.players.length%8];
+  tx.update(ref,{players:[...d.players,P.uid],[`info.${P.uid}`]:{name:myName(),avatar:myAvatar(),farbe},[`schlaege.${P.uid}`]:[],[`fertig.${P.uid}`]:[],updatedAt:Date.now()})});
+  oeffneRaum(id);
+ }catch(e){console.error(e);toast({weg:'Diesen Raum gibt es nicht mehr.',laeuft:'Die Runde läuft schon – beim nächsten Mal!',voll:'Der Raum ist voll (8 Spieler).'}[e.message]||'Beitreten hat nicht geklappt.')}
+}
+function oeffneRaum(id){
+ verlasseRaum(true);P.ref=P.fs.doc(`${PFAD}/${id}`);P.R=null;P.chat=[];P.chatSeen=new Set();P.chatNeu=0;P.letztesErg=null;go({name:'raum'});
+ P.unsub.push(P.ref.onSnapshot(s=>{if(!s.exists){toast('Der Raum wurde geschlossen.');verlasseRaum();return}const alt=P.R;P.R={...s.data(),id:s.id};nachRaumUpdate(alt)},e=>console.error(e)));
+ let erst=true;P.unsub.push(P.ref.collection('chat').orderBy('ts').limitToLast(150).onSnapshot(s=>{s.docChanges().forEach(ch=>{if(ch.type==='added')neueNachricht({...ch.doc.data(),id:ch.doc.id},erst)});erst=false;zeichneChat()},()=>{}));
+ let erstS=true;P.unsub.push(P.ref.collection('schuesse').orderBy('ts').limitToLast(60).onSnapshot(s=>{s.docChanges().forEach(ch=>{if(ch.type==='added')fremderSchuss(ch.doc.data(),erstS)});erstS=false},()=>{}));
+ clearInterval(P.tick);P.tick=setInterval(takt,500);
+}
+function verlasseRaum(still){P.unsub.forEach(u=>{try{u()}catch(e){}});P.unsub=[];clearInterval(P.tick);cancelAnimationFrame(P.raf);P.ref=null;P.R=null;P.runde=null;P.flug=null;P.geister={};if(!still)go({name:'menu'})}
+/* Live-Runde aus dem Raum ableiten (P.runde = Spiegel, damit Solo und Live denselben Code nutzen). */
+function rundeAusRaum(R){
+ const alt=P.runde&&P.runde.id===R.id?P.runde:null;
+ const r={id:R.id,modus:'live',platz:R.platz,loch:R.loch,ich:P.uid,spieler:aktive(R),info:R.info,schlaege:{},fertig:{},aktuell:alt&&alt.loch===R.loch?alt.aktuell:{[P.uid]:0},pos:R.pos||{}};
+ R.players.forEach(p=>{r.schlaege[p]=[...((R.schlaege||{})[p]||[])];r.fertig[p]=[...((R.fertig||{})[p]||[])]});
+ /* eigene, noch nicht bestätigte Daten behalten */
+ if(alt&&alt.loch===R.loch){r.schlaege[P.uid]=alt.schlaege[P.uid]&&alt.schlaege[P.uid].length>=r.schlaege[P.uid].length?alt.schlaege[P.uid]:r.schlaege[P.uid];r.fertig[P.uid]=alt.fertig[P.uid]&&alt.fertig[P.uid].length>=r.fertig[P.uid].length?alt.fertig[P.uid]:r.fertig[P.uid]}
+ return r;
+}
+function nachRaumUpdate(alt){
+ const R=P.R;
+ if(R.status==='abgebrochen'){toast('Der Raum wurde geschlossen.');verlasseRaum();return}
+ if(R.status==='lobby'){if(P.view.name!=='raum')go({name:'raum'});else render();return}
+ if(R.status==='fertig'){if(P.view.name==='ergebnis'&&P.ergebnisFuer===R.id)return;P.ergebnisFuer=R.id;P.runde=rundeAusRaum(R);P.runde.sieger=R.winner;rundeEnde();return}
+ const neueBahn=!P.runde||P.runde.id!==R.id||P.runde.loch!==R.loch;
+ P.runde=rundeAusRaum(R);
+ if(neueBahn){P.ball={...bahnVon(P.runde).start};P.flug=null;P.geister={};const pos=R.pos||{};for(const u of P.runde.spieler)if(u!==P.uid&&pos[u]&&pos[u].loch===R.loch)P.geister[u]={pos:{x:pos[u].x,y:pos[u].y}};
+  if((P.runde.fertig[P.uid]||[])[R.loch]){P.ball=null}else if(pos[P.uid]&&pos[P.uid].loch===R.loch){P.ball={x:pos[P.uid].x,y:pos[P.uid].y};P.runde.aktuell[P.uid]=pos[P.uid].n||0}
+  P.zugWeg=false;go({name:'spiel'});dranMeldung(R,null);return}
+ if(R.pause&&(!alt||!alt.pause))zeigeZwischenstand(null);
+ if(!alt||alt.dran!==R.dran||alt.zugStart!==R.zugStart){P.zugWeg=false;dranMeldung(R,alt)}
+ zeichneKopf();zugHinweis();
+}
+/* Wenn man selbst dran ist: Ton, Vibration, Hinweis. */
+function dranMeldung(R,alt){if(R.dran===P.uid&&(!alt||alt.dran!==P.uid)&&!R.pause){ton('dran');try{vib(30)}catch(e){}}zugHinweis()}
+function sendeSchuss(r,start,res,t0){
+ /* Pfad gekürzt: jeder 2. Punkt, ganze Zahlen – reicht für den Geisterball. */
+ /* Punkte mit gleichem t = Sprung (Teleport, Wasser → Abschlag): beide immer behalten. */
+ const P2=res.pfad;const pfad=[];P2.forEach((p,i)=>{if(i%2===0||i===P2.length-1||(P2[i-1]&&P2[i-1][0]===p[0])||(P2[i+1]&&P2[i+1][0]===p[0]))pfad.push(Math.round(p[0]),Math.round(p[1]),Math.round(p[2]))});
+ const ev=(res.ereignisse||[]).filter(e=>['wasser','loch','tele','boost','bumper'].includes(e[1])).slice(0,20).map(e=>[Math.round(e[0]),e[1],Math.round(e[2]),Math.round(e[3])]);
+ P.ref.collection('schuesse').add({by:P.uid,loch:r.loch,ts:Date.now(),t0,start:{x:Math.round(start.x),y:Math.round(start.y)},pfad,ende:{x:Math.round(res.ende.x),y:Math.round(res.ende.y)},versenkt:!!res.versenkt,wasser:!!res.wasser,dauer:Math.round(res.dauer),ev:JSON.stringify(ev)}).catch(e=>console.warn(e));
+ P.ref.update({[`pos.${P.uid}`]:{x:Math.round(res.ende.x),y:Math.round(res.ende.y),loch:r.loch,n:r.aktuell[r.ich]},[`zuletzt.${P.uid}`]:Date.now(),geschossen:Date.now(),updatedAt:Date.now()}).catch(()=>{});
+}
+function fremderSchuss(s,still){
+ const r=P.runde;if(!r||s.by===P.uid||s.loch!==r.loch)return;
+ const pfad=[];for(let i=0;i<s.pfad.length;i+=3)pfad.push([s.pfad[i],s.pfad[i+1],s.pfad[i+2]]);
+ const res={pfad,ende:s.ende,versenkt:s.versenkt,dauer:s.dauer,ereignisse:(()=>{try{return JSON.parse(s.ev||'[]')}catch(e){return[]}})()};
+ const g=P.geister[s.by]||(P.geister[s.by]={});
+ if(still||Date.now()-s.ts>s.dauer+2000){g.pos=s.ende;g.versenkt=s.versenkt;g.flug=null;return}
+ g.flug={res,start:performance.now(),ei:0,eigen:false};ton('puttLeise');
+}
+/* Takt: Gastgeber (oder Ersatz) schaltet zur nächsten Bahn, wenn alle fertig sind. */
+/* Takt (alle 500 ms): Hinweis „wer ist dran“ für alle. Der Gastgeber (oder Ersatz, falls er weg ist)
+   leitet: gibt den Zug weiter, wenn jemand die Zugzeit verstreicht, und schaltet zur nächsten Bahn,
+   wenn alle im Loch sind. Reihum wie auf dem echten Platz: ein Schlag, dann der Nächste. */
+async function takt(){
+ const R=P.R;if(!R||R.status!=='laeuft')return;zugHinweis();const akt=aktive(R);
+ const leiter=akt.includes(R.host)?R.host:akt[0];if(leiter!==P.uid)return;
+ const fertig=p=>((R.fertig||{})[p]||[])[R.loch];const alle=akt.every(fertig);
+ if(!alle){
+  /* Wer dran ist, ist weg oder schon im Loch → weitergeben */
+  if(!R.dran||!akt.includes(R.dran)||fertig(R.dran)){const n=naechsterDran(R,R.dran);if(n&&n!==R.dran)await P.ref.update({dran:n,zugStart:Date.now(),updatedAt:Date.now()}).catch(()=>{});return}
+  /* Zugzeit abgelaufen (ein laufender Schuss bekommt 14 s Kulanz) */
+  if(Date.now()-zugBeginn(R)<=ZUG_ZEIT)return;
+  const p=R.dran;const v=((R.verpasst||{})[p]||0)+1;const upd={[`verpasst.${p}`]:v,zugStart:Date.now(),updatedAt:Date.now()};
+  if(v>=VERPASST_MAX){const b=platzVon(R.platz).bahnen[R.loch];const s=[...((R.schlaege||{})[p]||[])],f=[...((R.fertig||{})[p]||[])];s[R.loch]=maxSchlaege(b);f[R.loch]=true;
+   upd[`schlaege.${p}`]=s;upd[`fertig.${p}`]=f;upd[`verpasst.${p}`]=0;upd.dran=naechsterDran(R,p,p)}else upd.dran=naechsterDran(R,p)||p;
+  await P.ref.update(upd).catch(()=>{});return}
+ if(!R.pause){await P.ref.update({pause:Date.now()+ZWISCHENSTAND_MS,dran:null,updatedAt:Date.now()}).catch(()=>{});return}
+ if(Date.now()<R.pause)return;
+ const anzahl=platzVon(R.platz).bahnen.length;
+ await P.fs.runTransaction(async tx=>{const s=await tx.get(P.ref);const d=s.data();if(d.loch!==R.loch||d.status!=='laeuft')return;
+  if(d.loch>=anzahl-1){const sum=p=>((d.schlaege||{})[p]||[]).reduce((a,b)=>a+(b||0),0);const l=aktive(d).map(p=>[p,sum(p)]).sort((a,b)=>a[1]-b[1]);
+   tx.update(P.ref,{status:'fertig',pause:0,dran:null,winner:l.length>1&&l[0][1]===l[1][1]?'remis':l[0][0],updatedAt:Date.now()})}
+  else{const reihe=neueReihe(d);tx.update(P.ref,{loch:d.loch+1,pause:0,lochStart:Date.now(),reihe,dran:reihe[0],zugStart:Date.now(),verpasst:{},updatedAt:Date.now()})}}).catch(e=>console.warn(e));
+}
+async function starten(){const R=P.R;if(!R||R.host!==P.uid)return;if(R.players.length<2){toast('Ihr braucht mindestens 2 Leute – oder spiel Solo.');return}
+ await P.ref.update({status:'laeuft',loch:0,pause:0,pos:{},lochStart:Date.now(),reihe:[...R.players],dran:R.players[0],zugStart:Date.now(),verpasst:{},updatedAt:Date.now()})}
+async function raumVerlassen(){closeOverlay();const R=P.R;if(!R){verlasseRaum();return}
+ try{if(R.status==='lobby'){if(R.players.length===1)await P.ref.update({status:'abgebrochen',updatedAt:Date.now()});else await P.ref.update({players:firebase.firestore.FieldValue.arrayRemove(P.uid),host:R.host===P.uid?R.players.find(p=>p!==P.uid):R.host,updatedAt:Date.now()})}
+  else if(R.status==='laeuft')await P.ref.update({weg:firebase.firestore.FieldValue.arrayUnion(P.uid),updatedAt:Date.now()})}catch(e){console.warn(e)}
+ verlasseRaum()}
+
+/* ---------- 6. Chat ---------- */
+function sende(text){text=String(text||'').trim().slice(0,120);if(!text||!P.ref)return;if(Date.now()-(P.lastSend||0)<500)return;P.lastSend=Date.now();
+ P.ref.collection('chat').add({by:P.uid,t:text,ts:Date.now()}).catch(()=>toast('Nachricht kam nicht an.'))}
+function neueNachricht(m,still){if(P.chatSeen.has(m.id))return;P.chatSeen.add(m.id);P.chat.push(m);if(still)return;
+ P.bubbles[m.by]={t:m.t,bis:Date.now()+3000};zeichneChips();setTimeout(zeichneChips,3100);
+ if(/^(\p{Extended_Pictographic}|️|‍){1,3}$/u.test(m.t||''))floatEmoji(m.t);
+ if(m.by!==P.uid&&!$('#chatsheet')&&P.view.name==='spiel'){P.chatNeu++;const n=$('#chatN');if(n){n.hidden=false;n.textContent=P.chatNeu>9?'9+':P.chatNeu}}}
+function zeichneChat(){const box=$('#msgs');if(!box)return;const R=P.R;
+ box.innerHTML=P.chat.slice(-120).map(m=>{const inf=(R&&R.info[m.by])||{name:'?'};return `<div class="m${m.by===P.uid?' ich':''}"><b>${esc(inf.name)}</b>${esc(m.t)}</div>`}).join('')||'<div class="m sys">Noch still hier. Sag hallo! 👋</div>';box.scrollTop=box.scrollHeight}
+function floatEmoji(e){const d=document.createElement('div');d.className='fly';d.textContent=e;d.style.left=(10+Math.random()*75)+'%';document.body.appendChild(d);setTimeout(()=>d.remove(),2800)}
+
+/* Töne (erzeugt): Putt, Bande, Wasser, Loch, Hole-in-One. */
+let AC=null;function ton(art){if(!LS.get(KEY('ton'),true))return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();const t0=AC.currentTime;
+ const rausch=(dauer,freq,laut,q=1)=>{const n=Math.round(AC.sampleRate*dauer);const b=AC.createBuffer(1,n,AC.sampleRate);const d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);const s=AC.createBufferSource();s.buffer=b;const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=freq;f.Q.value=q;const g=AC.createGain();g.gain.value=laut;s.connect(f).connect(g).connect(AC.destination);s.start(t0)};
+ const ton1=(f,d,typ='sine',laut=.2,start=0)=>{const o=AC.createOscillator(),g=AC.createGain();o.type=typ;o.frequency.value=f;g.gain.setValueAtTime(.0001,t0+start);g.gain.exponentialRampToValueAtTime(laut,t0+start+.01);g.gain.exponentialRampToValueAtTime(.0001,t0+start+d);o.connect(g).connect(AC.destination);o.start(t0+start);o.stop(t0+start+d+.05)};
+ if(art==='putt'){rausch(.06,2600,.5,2);ton1(900,.05,'triangle',.12)}
+ else if(art==='puttLeise'){rausch(.05,2600,.15,2)}
+ else if(art==='wand'){ton1(180,.08,'triangle',.18);rausch(.05,900,.25,1.5)}
+ else if(art==='dran'){[660,880].forEach((f,i)=>ton1(f,.14,'sine',.16,i*.12))}
+ else if(art==='lipout'){ton1(420,.07,'triangle',.14);ton1(300,.09,'triangle',.1,.05)}
+ else if(art==='bumper'){ton1(520,.12,'square',.08);ton1(780,.1,'triangle',.1,.03)}
+ else if(art==='wasser'){rausch(.5,500,.6,.7)}
+ else if(art==='sand'){rausch(.25,3500,.15,.6)}
+ else if(art==='tele'){ton1(300,.25,'sawtooth',.05);ton1(900,.2,'sine',.1,.08)}
+ else if(art==='boost'){ton1(200,.3,'sawtooth',.06);ton1(600,.25,'triangle',.08,.05)}
+ else if(art==='loch'){rausch(.12,1200,.4,3);[523,659,784].forEach((f,i)=>ton1(f,.15,'triangle',.15,.12+i*.09))}
+ else if(art==='ass'){rausch(.12,1200,.4,3);[523,659,784,1046,1318].forEach((f,i)=>ton1(f,.22,'triangle',.17,.1+i*.1))}
+}catch(e){}}
+
+/* ---------- 7. Ansichten ---------- */
+function go(v){P.view=v;render()}
+function render(){
+ const n=P.view.name;document.body.classList.toggle('full',n==='spiel');renderTop();
+ if(n==='spiel'){$('#view').innerHTML=spielGeruest();feldBauen();zeichneKopf();zeichneChips();setHinweis(kannSchiessen()?'Ziehen und loslassen':((P.runde.fertig[P.runde.ich]||[])[P.runde.loch]?'Warte auf die anderen …':''));return}
+ cancelAnimationFrame(P.raf);
+ const vw=$('#view');const keep={};vw.querySelectorAll('input[id]').forEach(i=>{if(!i.readOnly)keep[i.id]=i.value});const fokus=document.activeElement&&document.activeElement.id;
+ vw.innerHTML=(VIEWS[n]||VIEWS.menu)(P.view);
+ for(const id in keep){const el=document.getElementById(id);if(el&&!el.value)el.value=keep[id]}
+ if(fokus){const el=document.getElementById(fokus);if(el&&el.tagName==='INPUT')el.focus()}
+ if(n==='raum')zeichneChat();
+}
+function renderTop(){$('#top').innerHTML=`<div class="top-l"><a class="xbtn" href="../" aria-label="Zurück zu allen Spielen">‹</a><div class="logo">PUTT<span>CLASH</span></div></div>
+ <div class="top-r">${P.online?`<span class="chip"><i class="live"></i>${P.onlineIds.size+1}</span>`:''}${P.stand?`<span class="chip">🪙 ${fmt(muenzenGesamt())}</span><span class="chip gold">⭐ ${fmt(P.stand.punkte)}</span>`:''}</div>`}
+const avHTML=inf=>`<span class="av">${avatarSVG((inf||{}).avatar)}</span>`;
+function holeProfil(){openOverlay(`<h3>Erst ein Charakter</h3><p>Leg im Hub deinen Charakter an, dann kannst du mit Freunden putten.</p><div class="acts"><a class="btn block" href="../">Zum Hub</a><button class="btn ghost block" data-a="closeOvl">Später</button></div>`)}
+const PLATZ_FARBEN={park:['#3DDC97','#178A5A','#0A4F37'],wueste:['#FFC53D','#E0851A','#8A4C00'],eis:['#5BC0FF','#2753C9','#162F7A'],weltraum:['#9B6BFF','#3A1C71','#1B0F3A'],
+ piraten:['#2EC4D6','#0E7C9A','#08485A'],vulkan:['#FF6A3D','#B3261E','#5E120C']};
+function platzKarten(aktion,aktiv){return `<div class="plaetze">${BAHNEN.PLAETZE.map(p=>{const [g1,g2,sh]=PLATZ_FARBEN[p.id]||['#3D8BFF','#2753C9','#162F7A'];const par=p.bahnen.reduce((a,b)=>a+b.par,0);const rek=P.stand&&P.stand.beste[p.id];
+ return `<button class="platz${aktiv===p.id?' on':''}" style="--g1:${g1};--g2:${g2};--sh:${sh}" data-a="${aktion}" data-v="${p.id}">${rek?`<span class="rek">🏆 ${rek}</span>`:''}<span class="big">${p.emoji}</span><div><h3>${esc(p.name)}</h3><p>${p.bahnen.length} Bahnen · Par ${par}</p></div></button>`}).join('')}</div>`}
+const VIEWS={
+loading(){return `<div class="loading"><div class="spinq">⛳</div><p class="muted">Rasen wird gemäht …</p></div>`},
+menu(){
+ const st=P.stand||neuStand();const solo=LS.get(KEY('solo'),null);
+ const inv=Object.values(P.myInvites).filter(r=>r.status==='lobby'&&!r.players.includes(P.uid)&&Date.now()-(r.createdAt||0)<3600e3);
+ const lauf=Object.values(P.myGames).filter(r=>(r.status==='lobby'||r.status==='laeuft')&&!(r.weg||[]).includes(P.uid));
+ return `<div class="hero"><div class="hero-logo">PUTT<span>CLASH</span></div><div class="unter">Minigolf mit Freunden · ${BAHNEN.PLAETZE.length} Plätze · ${BAHNEN.alle().length} Bahnen</div></div>
+ ${DEMO?'<div class="notice"><b>Testmodus.</b> Nur Solo, ohne Datenbank.</div>':!P.online?'<div class="notice"><b>Offline.</b> Solo geht, für Freunde brauchst du Internet.</div>':''}
+ ${inv.map(r=>{const h=r.info[r.host]||{};return `<div class="row" style="margin-top:12px;border-color:var(--gold)">${avHTML(h)}<div class="mid"><div class="t1">${esc(h.name)} lädt dich ein!</div><div class="t2">${esc((platzVon(r.platz)||{}).name||'')} · ${r.players.length} Spieler</div></div><button class="btn small coral" data-a="beitreten" data-v="${esc(r.id)}">Rein da</button></div>`}).join('')}
+ ${lauf.map(r=>`<button class="row" style="margin-top:10px" data-a="oeffne" data-v="${esc(r.id)}"><span style="font-size:26px">${r.status==='lobby'?'🚪':'⛳'}</span><div class="mid"><div class="t1">${r.status==='lobby'?'Raum wartet':'Runde läuft'} · ${esc((platzVon(r.platz)||{}).name||'')}</div><div class="t2">${r.players.map(p=>esc((r.info[p]||{}).name)).join(', ')}</div></div><span class="tag go">Weiter</span></button>`).join('')}
+ ${solo&&solo.runde?`<button class="row" style="margin-top:10px;border-color:var(--mint)" data-a="soloWeiter"><span style="font-size:26px">▶️</span><div class="mid"><div class="t1">Solo weiterspielen</div><div class="t2">${esc(platzVon(solo.runde.platz).name)} · Bahn ${solo.runde.loch+1} von ${platzVon(solo.runde.platz).bahnen.length}</div></div><span class="tag go">Weiter</span></button>`:''}
+ <button class="mode" style="--g1:#FF6B57;--g2:#E2365A;--sh:#8F1C33" data-a="neuerRaum" ${!P.online||DEMO?'disabled':''}><span class="big">👥</span><div><h3>Mit Freunden</h3><p>2–8 Spieler, reihum wie auf dem echten Platz – jeder Schlag live bei allen.</p></div></button>
+ <h2 class="sec">Solo spielen <small>Platz wählen</small></h2>${platzKarten('solo')}
+ <h2 class="sec">Deine Bilanz</h2>
+ <div class="stats"><div class="stat"><b>${st.runden}</b><span>Runden</span></div><div class="stat"><b>${st.siege}</b><span>Siege</span></div><div class="stat"><b>${st.holeInOne}</b><span>Hole-in-One</span></div><div class="stat"><b>${st.bahnen}</b><span>Bahnen</span></div><div class="stat"><b>${Object.keys(st.plaetzeFertig||{}).length}/${BAHNEN.PLAETZE.length}</b><span>Plätze</span></div><div class="stat"><b>${fmt(st.punkte)}</b><span>Hub-Punkte</span></div></div>
+ <h2 class="sec">So geht’s</h2><div class="empty" style="text-align:left">Tipp irgendwo aufs Feld, <b>zieh zurück</b> und lass los – der Ball fliegt in die Gegenrichtung, je weiter du ziehst, desto fester. Wasser, Lava und Abgründe kosten einen Strafschlag. Höchstens Par + 4 Schläge je Bahn.<br><b>Münzen:</b> mit Freunden Sieger 5 🪙, alle anderen 1 🪙.</div>`;
+},
+raum(){
+ const R=P.R;if(!R)return VIEWS.loading();const host=R.host===P.uid;const url=`${location.origin}${location.pathname}#tisch-${R.id}`;
+ const freunde=Object.entries(P.profiles).filter(([id,p])=>id!==P.uid&&p&&p.name&&!R.players.includes(id)).sort((a,b)=>(P.onlineIds.has(b[0])?1:0)-(P.onlineIds.has(a[0])?1:0));
+ const slots=[...R.players.map(p=>`<div class="pslot" style="--fa:${(R.info[p]||{}).farbe}">${p===R.host?'<span class="kr">👑</span>':''}${avHTML(R.info[p])}<span class="nm">${esc((R.info[p]||{}).name)}</span></div>`),...Array(Math.max(0,4-R.players.length)).fill('<div class="pslot leer"><span class="av">?</span><span class="nm">frei</span></div>')];
+ return `<div class="raum"><div class="qtop"><button class="xbtn" data-a="verlassenFrage" aria-label="Verlassen">‹</button><div class="qlabel" style="font-size:20px">Golf-Raum</div><span style="width:42px"></span></div>
+ <h2 class="sec">Mitspieler <small>${R.players.length} / ${MAX_SPIELER}</small></h2><div class="pgrid">${slots.join('')}</div>
+ <h2 class="sec">Chat</h2><div class="chat"><div class="msgs" id="msgs" style="max-height:200px;min-height:90px"></div><form class="crow" id="chatForm"><input id="chatIn" class="inp" maxlength="120" autocomplete="off" placeholder="Schreib den anderen …" aria-label="Nachricht"><button class="sendb" aria-label="Senden">➤</button></form><div class="emorow">${EMOJIS.map(e=>`<button class="emo" data-a="emo" data-v="${e}">${e}</button>`).join('')}</div></div>
+ <h2 class="sec">Platz ${host?'':'<small>wählt der Gastgeber</small>'}</h2>${host?platzKarten('raumPlatz',R.platz):`<div class="empty"><b>${esc((platzVon(R.platz)||{}).emoji||'')} ${esc((platzVon(R.platz)||{}).name||'')}</b></div>`}
+ <h2 class="sec">Freunde einladen</h2>
+ <div class="list">${freunde.length?freunde.slice(0,12).map(([id,p])=>{const e=(R.invited||[]).includes(id);return `<div class="row"><span class="avwrap"><span class="av" style="width:42px;height:42px">${avatarSVG(p.avatar)}</span>${P.onlineIds.has(id)?'<i class="ondot"></i>':''}</span><div class="mid"><div class="t1">${esc(p.name)}</div><div class="t2">${P.onlineIds.has(id)?'online':'nicht online'}</div></div><button class="btn small${e?' ghost':''}" data-a="einladen" data-v="${esc(id)}" ${e?'disabled':''}>${e?'Eingeladen':'Einladen'}</button></div>`}).join(''):'<div class="empty">Alle Freunde sind schon drin – oder schick den Link.</div>'}</div>
+ <label class="lbl" for="invUrl">Oder Link schicken</label><input id="invUrl" class="inp" readonly value="${esc(url)}" style="font-size:13px">
+ <div class="acts" style="grid-template-columns:1fr 1fr"><button class="btn small" data-a="kopieren">📋 Kopieren</button><a class="btn small mint" href="https://wa.me/?text=${encodeURIComponent(`${myName()} lädt dich zu Puttclash ein! ⛳ ${url}`)}" target="_blank" rel="noopener">💬 WhatsApp</a></div>
+ ${host?`<button class="btn big" data-a="starten" ${R.players.length<2?'disabled':''}>${R.players.length<2?'Warte auf Mitspieler …':'⛳ Los geht’s!'}</button>`:`<div class="empty" style="margin-top:16px">Warte, bis <b>${esc((R.info[R.host]||{}).name)}</b> startet …</div>`}</div>`;
+}
+};
+function spielGeruest(){const live=P.runde&&P.runde.modus==='live';
+ return `<div class="spiel"><div class="kopf"><button class="ibtn" data-a="spielMenu" aria-label="Menü">‹</button><div class="binfo" id="binfo"></div>
+  <button class="ibtn" data-a="karte" aria-label="Scorekarte">📋</button>${live?`<button class="ibtn" data-a="chatAuf" aria-label="Chat">💬<i class="cbadge" id="chatN" hidden></i></button>`:''}<div class="zaehler" id="zaehler"></div></div>
+  <div class="feld" id="feld"><canvas id="cv"></canvas><div class="hinweis" id="hinweis"></div><div id="feldOvl"></div></div>
+  <div class="fuss"><div class="chips" id="chips"></div>${live?`<form class="crow" id="chatForm2"><input id="chatIn2" class="inp" maxlength="120" autocomplete="off" placeholder="Kurz was schreiben …" aria-label="Nachricht"><button class="sendb" aria-label="Senden">➤</button></form>`:''}</div></div>`}
+function zeichneKopf(){const r=P.runde;if(!r)return;const b=bahnVon(r);const i=$('#binfo'),z=$('#zaehler');
+ if(i)i.innerHTML=`<b>${esc(b.name)}</b><small>${esc(platzVon(r.platz).emoji)} Bahn ${r.loch+1}/${platzVon(r.platz).bahnen.length} · Par ${b.par}</small>`;
+ if(z)z.innerHTML=`<small>SCHLÄGE</small><b>${(r.fertig[r.ich]||[])[r.loch]?(r.schlaege[r.ich]||[])[r.loch]:(r.aktuell[r.ich]||0)}</b>`;zeichneChips()}
+function zeichneChips(){const r=P.runde;const c=$('#chips');if(!r||!c)return;
+ c.innerHTML=r.spieler.map(u=>{const inf=r.info[u]||{};const ok=(r.fertig[u]||[])[r.loch];const b=P.bubbles[u];const bl=b&&b.bis>Date.now()?`<span class="bl">${esc(b.t)}</span>`:'';
+  const dran=r.modus==='live'&&P.R&&P.R.dran===u;
+  return `<div class="chip2${ok?' ok':''}${u===r.ich?' ich':''}${dran?' dran':''}" style="--fa:${inf.farbe||'#fff'}">${bl}${avHTML(inf)}<span class="nm">${esc(inf.name)}</span><span class="sc">${summeVon(r,u)}${ok?' ✔':''}</span></div>`}).join('')}
+function karteHTML(r){const platz=platzVon(r.platz);
+ const kopf=`<tr><th></th>${platz.bahnen.map((b,i)=>`<th>${i+1}</th>`).join('')}<th>Σ</th></tr><tr><th style="text-align:left">Par</th>${platz.bahnen.map(b=>`<th>${b.par}</th>`).join('')}<th>${platz.bahnen.reduce((a,b)=>a+b.par,0)}</th></tr>`;
+ const zeilen=[...r.spieler].sort((a,b)=>summeVon(r,a)-summeVon(r,b)).map(u=>`<tr class="${u===r.ich?'akt':''}"><td class="nm" style="color:${(r.info[u]||{}).farbe}">${esc((r.info[u]||{}).name)}</td>${platz.bahnen.map((b,i)=>{const s=(r.schlaege[u]||[])[i];if(!s)return '<td>·</td>';const d=s-b.par;return `<td class="${s===1?'ass':d<0?'u':d>0?'o':''}">${s}</td>`}).join('')}<td class="sum">${summeVon(r,u)}</td></tr>`).join('');
+ return `<div class="karte"><table>${kopf}${zeilen}</table></div>`}
+function zeigeZwischenstand(weiter){const r=P.runde;const o=$('#feldOvl');if(!o||!r)return;const b=bahnVon(r);
+ o.innerHTML=`<div class="overlay"><div class="kasten"><h3>Bahn ${r.loch+1} geschafft!</h3><p class="muted" style="margin:0 0 6px">${esc(b.name)} · Par ${b.par}</p>${karteHTML(r)}<p class="muted" style="margin:8px 0 0;font-size:13px">${r.loch>=platzVon(r.platz).bahnen.length-1?'Gleich kommt das Ergebnis …':'Nächste Bahn kommt gleich …'}</p></div></div>`;
+ setTimeout(()=>{if(o)o.innerHTML='';if(weiter)weiter()},ZWISCHENSTAND_MS-300)}
+function rundeEnde(){
+ const r=P.runde;if(!r)return;cancelAnimationFrame(P.raf);clearInterval(P.tick);
+ if(r.modus==='solo'){LS.set(KEY('solo'),null);r.sieger=r.ich}
+ const erg=verbuche(r)||P.letztesErg;P.letztesErg=erg;renderTop();
+ const sc=[...r.spieler].sort((a,b)=>summeVon(r,a)-summeVon(r,b));const ich=r.sieger===r.ich;
+ if(erg&&erg.ass||ich)confetti(120);
+ document.body.classList.remove('full');P.view={name:'ergebnis'};
+ $('#view').innerHTML=`<div class="res"><div style="font-size:64px">${r.modus==='solo'?'⛳':ich?'🏆':'🏌️'}</div>
+  <h1>${r.modus==='solo'?`${summeVon(r,r.ich)} Schläge`:r.sieger==='remis'?'Unentschieden!':ich?'Du gewinnst!':`${esc((r.info[r.sieger]||{}).name)} gewinnt!`}</h1>
+  <p class="lead">${esc(platzVon(r.platz).name)} · Par ${platzVon(r.platz).bahnen.reduce((a,b)=>a+b.par,0)}${erg?` · +${fmt(erg.hub)} Hub-Punkte${erg.coins?` · <b style="color:var(--gold)">+${erg.coins} 🪙</b>`:''}${erg.ass?` · ${erg.ass}× Hole-in-One!`:''}`:''}</p>
+  ${karteHTML(r)}
+  <div class="acts"><button class="btn big" data-a="nochmal">🔁 Nochmal</button><button class="btn ghost block" data-a="zumMenu">Zum Menü</button></div></div>`;
+}
+
+/* ---------- 8. Aktionen ---------- */
+const A={
+ solo(ds){P.runde=soloRunde(ds.v);P.ball={...bahnVon(P.runde).start};P.geister={};LS.set(KEY('solo'),{runde:P.runde,ball:P.ball});go({name:'spiel'})},
+ soloWeiter(){const s=LS.get(KEY('solo'),null);if(!s)return;P.runde=s.runde;P.geister={};
+  /* Mitten im Wechsel gegangen (Bahn schon geschafft)? Dann gleich zur nächsten Bahn bzw. zum Ergebnis. */
+  if((P.runde.fertig[P.runde.ich]||[])[P.runde.loch]){if(P.runde.loch>=platzVon(P.runde.platz).bahnen.length-1){rundeEnde();return}naechsteBahnLokal();return}
+  P.ball=s.ball||{...bahnVon(P.runde).start};go({name:'spiel'})},
+ neuerRaum(){raumAnlegen([],'park')},
+ beitreten(ds){beitreten(ds.v)},
+ oeffne(ds){oeffneRaum(ds.v)},
+ raumPlatz(ds){if(P.R&&P.R.host===P.uid)P.ref.update({platz:ds.v,updatedAt:Date.now()})},
+ einladen(ds){P.ref.update({invited:firebase.firestore.FieldValue.arrayUnion(ds.v),updatedAt:Date.now()}).then(()=>toast('Eingeladen!')).catch(()=>toast('Einladen hat nicht geklappt.'))},
+ kopieren(){const i=$('#invUrl');try{navigator.clipboard.writeText(i.value).then(()=>toast('Link kopiert'),()=>{i.select()})}catch(e){i.select()}},
+ starten(){starten()},
+ emo(ds){sende(ds.v)},
+ karte(){const r=P.runde;if(!r)return;openOverlay(`<h3>Scorekarte</h3><p>${esc(platzVon(r.platz).name)}</p>${karteHTML(r)}<div class="acts"><button class="btn ghost block" data-a="closeOvl">Schließen</button></div>`)},
+ chatAuf(){P.chatNeu=0;const n=$('#chatN');if(n)n.hidden=true;const el=document.createElement('div');el.id='chatsheet';el.className='chatsheet';
+  el.innerHTML=`<div class="bg" data-a="chatZu"></div><div class="pn"><div class="kz"><b style="font-weight:400">💬 Chat</b><button class="ibtn" data-a="chatZu" aria-label="Schließen">✕</button></div><div class="msgs" id="msgs"></div><form class="crow" id="chatForm"><input id="chatIn" class="inp" maxlength="120" autocomplete="off" placeholder="Nachricht …"><button class="sendb">➤</button></form><div class="emorow">${EMOJIS.map(e=>`<button class="emo" data-a="emo" data-v="${e}">${e}</button>`).join('')}</div></div>`;
+  document.body.appendChild(el);zeichneChat();setTimeout(()=>{const i=$('#chatIn');i&&i.focus()},200)},
+ chatZu(){const el=$('#chatsheet');el&&el.remove()},
+ spielMenu(){const live=P.runde&&P.runde.modus==='live';openOverlay(`<h3>Pause</h3><p>${live?'Wenn du gehst, spielen die anderen ohne dich weiter.':'Deine Solo-Runde wird gespeichert.'}</p><div class="acts"><button class="btn block" data-a="closeOvl">Weiterspielen</button><button class="btn coral block" data-a="${live?'verlassen':'zumMenu'}">${live?'Runde verlassen':'Zum Menü'}</button><button class="btn ghost block" data-a="togTon">🔊 Ton ${LS.get(KEY('ton'),true)?'aus':'an'}</button></div>`)},
+ togTon(){LS.set(KEY('ton'),!LS.get(KEY('ton'),true));closeOverlay()},
+ verlassenFrage(){openOverlay(`<h3>Raum verlassen?</h3><div class="acts"><button class="btn coral block" data-a="verlassen">Verlassen</button><button class="btn ghost block" data-a="closeOvl">Bleiben</button></div>`)},
+ verlassen(){raumVerlassen()},
+ zumMenu(){closeOverlay();if(P.runde&&P.runde.modus==='live')verlasseRaum();else{cancelAnimationFrame(P.raf);P.runde=null;go({name:'menu'})}},
+ nochmal(){const r=P.runde;if(!r){go({name:'menu'});return}if(r.modus==='solo'){A.solo({v:r.platz})}else{const andere=r.spieler.filter(p=>p!==P.uid);verlasseRaum(true);raumAnlegen(andere,r.platz)}},
+ closeOvl(){closeOverlay()},
+ ovlBg(ds,el,e){if(e.target===el)closeOverlay()}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;const f=A[el.dataset.a];if(f)f(el.dataset,el,e)});
+document.addEventListener('submit',e=>{const id=e.target.id;if(id!=='chatForm'&&id!=='chatForm2')return;e.preventDefault();const i=$(id==='chatForm'?'#chatIn':'#chatIn2');sende(i.value);i.value='';if(id==='chatForm2')i.blur()});
+document.addEventListener('pointerdown',e=>{if(e.target.id==='cv')zielStart(e)});
+document.addEventListener('pointermove',e=>{if(P.zieh)zielBewegt(e)},{passive:false});
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,()=>{if(P.zieh)zielEnde()}));
+
+/* ---------- 9. Start ---------- */
+async function boot(){
+ const c=LS.get(PROFILE_KEY,null);P.me=c&&c.name?c:null;render();
+ const fb=DEMO?null:await HubFirebase.start();
+ if(fb){P.online=true;P.fs=fb.fs;P.uid=fb.uid;
+  try{const s=await P.fs.doc('profiles/'+P.uid).get();if(s.exists&&s.data().name)P.me={...(P.me||{}),...s.data()}}catch(e){}
+  P.fs.collection('profiles').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());P.profiles=m;if(P.view.name==='menu'||P.view.name==='raum')render()},()=>{});
+  HubFirebase.presence(P.fs,P.uid,ids=>{P.onlineIds=ids;if(P.view.name==='menu'||P.view.name==='raum')render();else renderTop()});
+ }
+ await ladeStand();
+ if(P.online){
+  P.fs.collection(PFAD).where('players','array-contains',P.uid).onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});P.myGames=m;if(P.view.name==='menu')render()},()=>{});
+  P.fs.collection(PFAD).where('invited','array-contains',P.uid).onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});
+   for(const r of Object.values(m))if(!P.myInvites[r.id]&&r.status==='lobby'&&!r.players.includes(P.uid)&&Date.now()-(r.createdAt||0)<3600e3){const h=r.info[r.host]||{};toast(`${h.name} lädt dich zu Puttclash ein!`,{av:h.avatar,ms:7000})}
+   P.myInvites=m;if(P.view.name==='menu')render()},()=>{});
+ }
+ const h=(location.hash||'').replace(/^#/,'');
+ if(h.startsWith('tisch-')&&P.online){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+  const id=h.slice(6);if(/^[a-z0-9]{6,40}$/i.test(id)){const s=await P.fs.doc(`${PFAD}/${id}`).get().catch(()=>null);if(s&&s.exists&&s.data().players.includes(P.uid)){oeffneRaum(id);return}go({name:'menu'});beitreten(id);return}}
+ go({name:'menu'});
+}
+boot();
+</script>
+</body>
+</html>
