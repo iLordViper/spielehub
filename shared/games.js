@@ -90,6 +90,23 @@ const GAMES=[
   muenzen:(p,s)=>s.muenzen||0,
   siege:(p,s)=>s.siege||0,
   werte:(p,s)=>[[fmt(s.punkte),'Punkte'],[s.siege||0,'Siege'],[s.spiele||0,'Partien'],[s.erraten||0,'Erraten'],[s.gemalt||0,'Gemalt'],[fmt(s.bestePunkte),'Bestes Spiel']]
+ },
+ {
+  id:'puttclash',
+  name:'Puttclash',
+  emoji:'⛳',
+  pfad:'puttclash/',
+  status:'live',
+  kurz:'Minigolf auf 6 Plätzen mit 36 Bahnen. Solo oder reihum mit bis zu 8 Freunden – mit Mühlen, Teleportern, Eis und Lava.',
+  tags:['⛳ 36 Bahnen','👥 2–8','⚡ Live','🏆 Rekorde'],
+  farbe:['#3DDC97','#178A5A','#0A4F37'],
+  spielstand:true,
+  live:true,
+  /* beste = {platzId: wenigste Schläge}; plaetzeFertig = {platzId:true} */
+  punkte:(p,s)=>s.punkte||0,
+  muenzen:(p,s)=>s.muenzen||0,
+  siege:(p,s)=>s.siege||0,
+  werte:(p,s)=>[[fmt(s.punkte),'Punkte'],[s.siege||0,'Siege'],[s.runden||0,'Runden'],[s.holeInOne||0,'Hole-in-One'],[s.bahnen||0,'Bahnen'],[Object.keys(s.plaetzeFertig||{}).length,'Plätze']]
  }
  /* Nächstes Spiel hier anhängen, z. B.:
  ,{

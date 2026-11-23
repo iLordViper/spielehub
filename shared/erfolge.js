@@ -29,7 +29,9 @@ const HUB_ERFOLGE=[
  ['rekord','📜','Würfelkönig','250 Punkte in einem Würfelclash-Spiel',250,k=>k.stand('wuerfelclash').rekord||0],
  ['live','🤝','Herausforderer','Ein Live-Würfelduell gewonnen',1,k=>k.stand('wuerfelclash').liveSiege||0],
  ['blick','👀','Scharfer Blick','25 Begriffe in Kritzelclash erraten',25,k=>k.stand('kritzelclash').erraten||0],
- ['kuenstler','🎨','Künstler','20 Bilder in Kritzelclash gemalt',20,k=>k.stand('kritzelclash').gemalt||0]
+ ['kuenstler','🎨','Künstler','20 Bilder in Kritzelclash gemalt',20,k=>k.stand('kritzelclash').gemalt||0],
+ ['ass','⛳','Hole-in-One!','Eine Minigolf-Bahn mit einem Schlag',1,k=>k.stand('puttclash').holeInOne||0],
+ ['golfweltreise','🌍','Weltreise','Alle 6 Puttclash-Plätze durchgespielt',6,k=>Object.keys(k.stand('puttclash').plaetzeFertig||{}).length]
 ];
 /* Kontext für einen Spieler bauen und alle Erfolge auswerten. */
 function erfolgeVon(p,uid){
