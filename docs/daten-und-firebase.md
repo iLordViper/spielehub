@@ -28,6 +28,7 @@ Wer Browserdaten löscht, im privaten Fenster spielt oder das Gerät wechselt, b
 | `partien/{spiel}/liste/{id}` | Live-Partien (z. B. Würfelclash-Duelle) | Mitspieler |
 | `partien/{spiel}/liste/{id}/chat/{msg}` | Chat einer Partie | Mitspieler, nur unter eigenem Namen; nie gelöscht |
 | `partien/{spiel}/liste/{id}/zuege/{zug}/striche/{s}` | Zeichenstriche (Kritzelclash) | Mitspieler (anlegen, löschen für Rückgängig) |
+| `partien/{spiel}/liste/{id}/schuesse/{s}` | Schüsse mit Ballpfad (Puttclash, für die Geisterbälle) | Mitspieler, nur unter eigenem Namen |
 
 ## Hauptprofil: Level, Münzen, Erfolge
 
@@ -43,7 +44,8 @@ Wer Browserdaten löscht, im privaten Fenster spielt oder das Gerät wechselt, b
 | `ka_bot`, `ka_sound`, `ka_read` | Brainclash |
 | `wc_stand`, `wc_lokal`, `wc_tipps`, `wc_ton` | Würfelclash: Statistik-Kopie, laufende lokale Partie, Einstellungen |
 | `kc_stand`, `kc_dicke`, `kc_ton`, `kc_wort_*` | Kritzelclash: Statistik-Kopie, Pinselgröße, Ton, eigener Begriff (falls die Seite beim Malen neu lädt) |
-| `hub_demo_profile`, `wc_demo_*` | Nur Testmodus `?demo` – absichtlich getrennt |
+| `pc_stand`, `pc_solo`, `pc_ton` | Puttclash: Statistik-Kopie, laufende Solo-Runde, Ton |
+| `hub_demo_profile`, `wc_demo_*`, `kc_demo_*`, `pc_demo_*` | Nur Testmodus `?demo` – absichtlich getrennt |
 
 ## Regeln ändern
 
